@@ -31,27 +31,35 @@ def byte_not(val):
 
 class Emulator:
     def __init__(self):
-        self.prgm_ctr = 0
+        self.prgm_start = 0x0800
+        self.prgm_file = "test.bin"
+
+        self.prgm_ctr = self.prgm_start
         self.regs = [0,0,0,0]
         self.stack_ptr = 0xff
 
         self.mem = [0]*(2**16)
 
-        with open("test/test.bin", "rb") as f:
-            self.prgm = f.read()
+        # load program to memory
+        with open(self.prgm_file, "rb") as f:
+            for index, val in enumerate(f.read()):
+                self.mem[self.prgm_start + index] = val
 
         # operation, nbytes
         self.opcodes = {
             0x00: [lambda oc : None, 2**18], # BRK : a big nbbyte will cause the pc to overflow and the program to stop
             
-            0x69: [self.adc, 2], # immediate
-            0x65: [self.adc, 2], # zeropage
+            ## ADD
+            0x69: [lambda oc: self.adc(IMMEDIATE), 2],
+            0x65: [lambda oc: self.adc(ZEROPAGE), 2], 
+            0x75: [lambda oc: self.adc(ZEROPAGE_X), 2],
+            0x6d: [lambda oc: self.adc(ABSOLUTE), 3],
+            0x7d: [lambda oc: self.adc(ABSOLUTE_X), 3],
+            0x79: [lambda oc: self.adc(ABSOLUTE_Y), 3],
+            0x61: [lambda oc: self.adc(PRE_INDEX_INDIRECT), 2],
+            0x71: [lambda oc: self.adc(POST_INDEX_INDIRECT), 2],
 
-
-            0x90: [lambda oc: self.branch(STATUS_CARRY, True), 2], # BCC Branch Carry Clear
-
-            0xaa: [self.tax, 1],
-
+            ## LOADS
             0xa9: [lambda oc: self.ld(REG_A, IMMEDIATE), 2],
             0xa5: [lambda oc: self.ld(REG_A, ZEROPAGE), 2],
             0xb5: [lambda oc: self.ld(REG_A, ZEROPAGE_X), 2],
@@ -73,6 +81,8 @@ class Emulator:
             0xac: [lambda oc: self.ld(REG_Y, ABSOLUTE), 3],
             0xbc: [lambda oc: self.ld(REG_Y, ABSOLUTE_X), 3],
 
+
+            ## STORE
             0x85: [lambda oc: self.st(REG_A, ZEROPAGE), 2],
             0x95: [lambda oc: self.st(REG_A, ZEROPAGE_X), 2],
             0x8d: [lambda oc: self.st(REG_A, ABSOLUTE), 3],
@@ -89,13 +99,17 @@ class Emulator:
             0x94: [lambda oc: self.st(REG_Y, ZEROPAGE_X), 2],
             0x8c: [lambda oc: self.st(REG_Y, ABSOLUTE), 3],
 
-            0xaa: [lambda oc: self.tr(REG_A, REG_X), 1],
-            0xa8: [lambda oc: self.tr(REG_A, REG_Y), 1],
-            0xba: [lambda oc: self.tr(REG_S, REG_X), 1],
-            0x8a: [lambda oc: self.tr(REG_X, REG_A), 1],
-            0x9a: [lambda oc: self.tr(REG_X, REG_S), 1],
-            0x98: [lambda oc: self.tr(REG_Y, REG_A), 1],
 
+            ## TRANSFER
+            0xaa: [lambda oc: self.tr(REG_A, REG_X), 1], # TAX
+            0xa8: [lambda oc: self.tr(REG_A, REG_Y), 1], # TAY
+            0xba: [lambda oc: self.tr(REG_S, REG_X), 1], # TSX
+            0x8a: [lambda oc: self.tr(REG_X, REG_A), 1], # TXA
+            0x9a: [lambda oc: self.tr(REG_X, REG_S), 1], # TXS
+            0x98: [lambda oc: self.tr(REG_Y, REG_A), 1], # TYA
+
+
+            ## COMPARE
             0xc9: [lambda oc: self.cp(REG_A, IMMEDIATE), 2],
             0xc5: [lambda oc: self.cp(REG_A, ZEROPAGE), 2],
             0xd5: [lambda oc: self.cp(REG_A, ZEROPAGE_X), 2],
@@ -105,7 +119,7 @@ class Emulator:
             0xc1: [lambda oc: self.cp(REG_A, PRE_INDEX_INDIRECT), 2],
             0xd1: [lambda oc: self.cp(REG_A, POST_INDEX_INDIRECT), 2],
 
-            0xe8: [lambda oc: self.cp(REG_X, IMMEDIATE), 2],
+            0xe0: [lambda oc: self.cp(REG_X, IMMEDIATE), 2],
             0xe4: [lambda oc: self.cp(REG_X, ZEROPAGE), 2],
             0xec: [lambda oc: self.cp(REG_X, ABSOLUTE), 3],
 
@@ -113,34 +127,51 @@ class Emulator:
             0xc4: [lambda oc: self.cp(REG_Y, ZEROPAGE), 2],
             0xcc: [lambda oc: self.cp(REG_Y, ABSOLUTE), 3],
 
-            0x48: [self.pha, 1],
-            0x68: [self.pla, 1],
 
-            0xb0: [lambda oc: self.branch(STATUS_CARRY, False), 2], # BCS Branch Carry Set
+            ## STACK PUSH/PULL
+            0x48: [lambda oc: self.ph(REG_A), 1], # PHA
+            0x68: [lambda oc: self.pl(REG_A), 1], # PLA
+            0x08: [lambda oc: self.ph(REG_S), 1], # PHP
+            0x28: [lambda oc: self.pl(REG_S), 1], # PLP
 
-            0xca: [lambda oc: self.in_de_(REG_X, sign_plus=False), 1],
+
+            ## INCREASE / DECREASE
+            0xca: [lambda oc: self.in_de_(REG_X, sign_plus=False), 1], #DEX
             0x88: [lambda oc: self.in_de_(REG_Y, sign_plus=False), 1], #DEY
 
             0xe8: [lambda oc: self.in_de_(REG_X, sign_plus=True), 1], # INX
             0xc8: [lambda oc: self.in_de_(REG_Y, sign_plus=True), 1], # INY
 
-            0xd0: [lambda oc: self.branch(STATUS_ZERO, True), 2], # only relative
 
-            0xf0: [lambda oc: self.branch(STATUS_ZERO, False), 2], #BEQ (inv of BNE)
+            ## BRANCH
+            0xd0: [lambda oc: self.branch(STATUS_ZERO, True), 2], # BNE
+            0xf0: [lambda oc: self.branch(STATUS_ZERO, False), 2], # BEQ (inv of BNE)
+            0x90: [lambda oc: self.branch(STATUS_CARRY, True), 2], # BCC Branch Carry Clear
+            0xb0: [lambda oc: self.branch(STATUS_CARRY, False), 2], # BCS Branch Carry Set
+            0x30: [lambda oc: self.branch(STATUS_NEG, False), 2], # BMI Branch on result is negative (mi = minus)
+            0x10: [lambda oc: self.branch(STATUS_NEG, True), 2], # BPL Branch on result is positive (pl = plsu)
+            0x50: [lambda oc: self.branch(STATUS_OVFLO, True), 2], # BVC Branch on overflow clear
+            0x70: [lambda oc: self.branch(STATUS_OVFLO, False), 2], # BVS Branch on overflow set
 
-            0x4c: [lambda oc: self.jmp(ABSOLUTE), 0],
-            0x6c: [lambda oc: self.jmp(INDIRECT), 0],
+
+            ## JUMP
+            # 0 byte shift because we handle the shift in the function call
+            0x4c: [lambda oc: self.jmp(ABSOLUTE), 0], # JMP
+            0x6c: [lambda oc: self.jmp(INDIRECT), 0], # JMP
+            0x20: [self.jsr, 0], # JSR
+            0x60: [self.rts, 0], # RTS
+
         }
 
     def set_status_bit(self, status_bit, on):
         if on:
             self.regs[REG_S] |= status_bit
         else:
-            self.regs[REG_S] &= not(status_bit)
+            self.regs[REG_S] &= byte_not(status_bit)
 
     def get_addr_val(self, mode):
         if mode in (ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y):
-            addr = self.prgm[self.prgm_ctr+1] + self.prgm[self.prgm_ctr+2] * 256
+            addr = self.mem[self.prgm_ctr+1] + self.mem[self.prgm_ctr+2] * 256
             if mode == ABSOLUTE_X:
                 addr += self.regs[REG_X]
                 addr %= 65536
@@ -149,7 +180,7 @@ class Emulator:
                 addr %= 65536
 
         elif mode in (ZEROPAGE, ZEROPAGE_X, ZEROPAGE_Y):
-            addr = self.prgm[self.prgm_ctr+1]
+            addr = self.mem[self.prgm_ctr+1]
             if mode == ZEROPAGE_X:
                 addr += self.regs[REG_X]
                 addr %= 256 # zeropage wraps
@@ -187,7 +218,7 @@ class Emulator:
             addr %= 65536
             
         elif mode == IMMEDIATE:
-            val = self.prgm[self.prgm_ctr+1]
+            val = self.mem[self.prgm_ctr+1]
             return None, val
 
         else:
@@ -197,50 +228,73 @@ class Emulator:
         
         return addr, self.mem[addr]
     
+    def update_zn_flag(self, value):
+        self.set_status_bit(STATUS_ZERO, value == 0)
+        self.set_status_bit(STATUS_NEG, value & 0b10000000 != 0)
+    
     def jmp(self, addr_mode):
         addr, _ = self.get_addr_val(addr_mode)
+        print(hex(addr))
         self.prgm_ctr = addr
             
-    def pha(self, oc):
+    def stack_push(self, val):
+        addr = self.stack_ptr + 0x01 * 255
+        self.mem[addr] = val
+        self.stack_ptr -= 1
+
+    def stack_pull(self):
+        self.stack_ptr += 1
+        addr = self.stack_ptr + 0x01 * 255
+        return self.mem[addr]
+
+    def jsr(self, opcode):
+        self.stack_push(self.prgm_ctr + 2)
+        self.jmp(ABSOLUTE)
+
+    def rts(self, opcode):
+        addr = self.stack_pull()
+        self.prgm_ctr = addr + 1
+
+    def ph(self, reg):
         # stack begins at 0x01ff and ends at 0x0100
         if self.stack_ptr == 0:
             raise Exception("Stack overflow")
-        addr = self.stack_ptr + 0x01 * 255
-        self.mem[addr] = self.regs[REG_A]
-        self.stack_ptr -= 1
+        self.stack_push(self.regs[reg])
 
-    def pla(self, oc):
+    def pl(self, reg):
         # stack begins at 0x01ff and ends at 0x0100
         if self.stack_ptr == 0xff:
             raise Exception("Empty stack")
-        self.stack_ptr += 1
-        addr = self.stack_ptr + 0x01 * 255
-        self.regs[REG_A] = self.mem[addr]
+        val = self.stack_pull()
+        self.regs[reg] = val
+        if reg != REG_S:
+            # for REG_S it is already handled!
+            self.update_zn_flag(val)
 
     def ld(self, reg, addr_mode):
         # load accumulator
-        _, value = self.get_addr_val(addr_mode)
-        self.regs[reg] = value
+        _, val = self.get_addr_val(addr_mode)
+        self.regs[reg] = val
+        self.update_zn_flag(val)
 
     def st(self, reg, addr_mode):   
         if addr_mode == IMMEDIATE:
             raise Exception
 
         addr, _ = self.get_addr_val(addr_mode)
-        self.mem[addr] = self.regs[reg]
-
+        val = self.regs[reg]
+        self.mem[addr] = val
+        self.update_zn_flag(val)
+        
     def tr(self, sreg, dreg):
-        self.regs[dreg] = self.regs[sreg]
+        val = self.regs[sreg]
+        self.regs[dreg] = val
+        self.update_zn_flag(val)
         
     def cp(self, reg, addr_mode):
         _, val = self.get_addr_val(addr_mode)
-        self.set_status_bit(STATUS_ZERO, val == self.regs[reg])
-
-    def tax(self, opcode):
-        if opcode == 0xaa:
-            self.regs[REG_X] = self.regs[REG_A]
-        else:
-            raise Exception
+        diff = self.regs[reg] - val
+        self.update_zn_flag(diff) #status_zero goes to 0 if equality
 
     def in_de_(self, reg, sign_plus=True):
         # increase or decrease handler
@@ -249,35 +303,15 @@ class Emulator:
         else:
             self.regs[reg] -= 1
         self.regs[reg] %= 256
+        self.update_zn_flag(self.regs[reg])
 
-    def adc(self, opcode):
-        if opcode == 0x69:
-            self.regs[REG_A] += self.prgm[self.prgm_ctr+1]
-            self.set_status_bit(STATUS_CARRY, self.regs[REG_A] > 255)
-            self.regs[REG_A] %= 256
+    def adc(self, addr_mode):
+        _, val = self.get_addr_val(addr_mode)
+        self.regs[REG_A] += val
+        self.set_status_bit(STATUS_CARRY, self.regs[REG_A] > 255)
+        self.regs[REG_A] %= 256
+        self.update_zn_flag(self.regs[REG_A])
 
-        elif opcode == 0x65:
-            # zeropage
-            addr = self.prgm[self.prgm_ctr + 1]
-            self.regs[REG_A] += self.mem[addr]
-            self.set_status_bit(STATUS_CARRY, self.regs[REG_A] > 255)
-            self.regs[REG_A] %= 256
-
-        else:
-            raise Exception
-
-    def bne(self, opcode):
-        self
-        if opcode == 0xd0:
-            if self.regs[REG_S] & STATUS_ZERO == 0:
-                # branch
-                branch_addr = self.prgm[self.prgm_ctr + 1]
-                if branch_addr & 0b10000000 != 0:
-                    # negative number
-                    branch_addr -= 256
-                self.prgm_ctr += branch_addr
-        else:
-            raise Exception
         
     def branch(self, status_bit, branch_if_zero):
         do_branch = False
@@ -287,7 +321,7 @@ class Emulator:
             do_branch = not do_branch
         if do_branch:
             # branch
-            branch_addr = self.prgm[self.prgm_ctr + 1]
+            branch_addr = self.mem[self.prgm_ctr + 1]
             if branch_addr & 0b10000000 != 0:
                 # negative number
                 branch_addr -= 256
@@ -295,8 +329,11 @@ class Emulator:
 
 
     def run(self):
-        while self.prgm_ctr < len(self.prgm):
-            opcode = self.prgm[self.prgm_ctr]
+        while True:
+            opcode = self.mem[self.prgm_ctr]
+            if opcode == 0x00:
+                # TODO : handle BRK in a better way (raise interrupt flag)
+                break
             if not opcode in self.opcodes:
                 raise Exception(f"Unknown opcode {hex(opcode)}")
             func, nbytes = self.opcodes[opcode]
@@ -305,7 +342,7 @@ class Emulator:
             self.dbg()
 
     def dbg(self):
-        print("PC  :", self.prgm_ctr,
+        print("PC :", hex(self.prgm_ctr),
               "\tA :", hex(self.regs[REG_A]),
               "\tX :", hex(self.regs[REG_X]),
               "\tY :", hex(self.regs[REG_Y]),
