@@ -16,6 +16,7 @@ ABSOLUTE_Y = 6
 INDIRECT = 8
 PRE_INDEX_INDIRECT = 9
 POST_INDEX_INDIRECT = 10
+ACCUMULATOR = 11
 
 # status register
 STATUS_NEG   = 0b10000000
@@ -58,6 +59,44 @@ class Emulator:
             0x79: [lambda oc: self.adc(ABSOLUTE_Y), 3],
             0x61: [lambda oc: self.adc(PRE_INDEX_INDIRECT), 2],
             0x71: [lambda oc: self.adc(POST_INDEX_INDIRECT), 2],
+
+            ## AND
+            0x29: [lambda oc: self.and_(IMMEDIATE), 2],
+            0x25: [lambda oc: self.and_(ZEROPAGE), 2], 
+            0x35: [lambda oc: self.and_(ZEROPAGE_X), 2],
+            0x2D: [lambda oc: self.and_(ABSOLUTE), 3],
+            0x3D: [lambda oc: self.and_(ABSOLUTE_X), 3],
+            0x39: [lambda oc: self.and_(ABSOLUTE_Y), 3],
+            0x21: [lambda oc: self.and_(PRE_INDEX_INDIRECT), 2],
+            0x31: [lambda oc: self.and_(POST_INDEX_INDIRECT), 2],
+
+            ## OR
+            0x09: [lambda oc: self.or_(IMMEDIATE), 2],
+            0x05: [lambda oc: self.or_(ZEROPAGE), 2], 
+            0x15: [lambda oc: self.or_(ZEROPAGE_X), 2],
+            0x0d: [lambda oc: self.or_(ABSOLUTE), 3],
+            0x1d: [lambda oc: self.or_(ABSOLUTE_X), 3],
+            0x19: [lambda oc: self.or_(ABSOLUTE_Y), 3],
+            0x01: [lambda oc: self.or_(PRE_INDEX_INDIRECT), 2],
+            0x11: [lambda oc: self.or_(POST_INDEX_INDIRECT), 2],
+
+            ## CLEAR STATUS
+            0x18: [lambda oc: self.set_status_bit(STATUS_CARRY, False), 1], # CLC
+            0xd8: [lambda oc: self.set_status_bit(STATUS_DEC, False), 1], # CLD
+            0x58: [lambda oc: self.set_status_bit(STATUS_INTER, False), 1], # CLI
+            0xb8: [lambda oc: self.set_status_bit(STATUS_OVFLO, False), 1], # CLV
+
+            ## SET STATUS
+            0x38: [lambda oc: self.set_status_bit(STATUS_CARRY, True), 1], # SEC
+            0xf8: [lambda oc: self.set_status_bit(STATUS_DEC, True), 1], # SED
+            0x78: [lambda oc: self.set_status_bit(STATUS_INTER, True), 1], # SEI
+
+            ## BIT SHIFT
+            0x4a: [lambda oc: self.shift_right(ACCUMULATOR), 2], # LSR
+            0x46: [lambda oc: self.shift_right(ZEROPAGE), 2],
+            0x56: [lambda oc: self.shift_right(ZEROPAGE_X), 2],
+            0x4e: [lambda oc: self.shift_right(ABSOLUTE), 2],
+            0x5e: [lambda oc: self.shift_right(ABSOLUTE_X), 2],
 
             ## LOADS
             0xa9: [lambda oc: self.ld(REG_A, IMMEDIATE), 2],
@@ -217,6 +256,10 @@ class Emulator:
             addr += self.regs[REG_Y]
             addr %= 65536
             
+        elif mode == ACCUMULATOR:
+            val = self.regs[REG_A]
+            return None, val
+
         elif mode == IMMEDIATE:
             val = self.mem[self.prgm_ctr+1]
             return None, val
@@ -231,6 +274,9 @@ class Emulator:
     def update_zn_flag(self, value):
         self.set_status_bit(STATUS_ZERO, value == 0)
         self.set_status_bit(STATUS_NEG, value & 0b10000000 != 0)
+
+    def clear(self, status_bit):
+        self.set_status_bit(status_bit, False)
     
     def jmp(self, addr_mode):
         addr, _ = self.get_addr_val(addr_mode)
@@ -312,7 +358,16 @@ class Emulator:
         self.regs[REG_A] %= 256
         self.update_zn_flag(self.regs[REG_A])
 
-        
+    def and_(self, addr_mode):
+        _, val = self.get_addr_val(addr_mode)
+        self.regs[REG_A] |= val
+        self.update_zn_flag(self.regs[REG_A])
+
+    def or_(self, addr_mode):
+        _, val = self.get_addr_val(addr_mode)
+        self.regs[REG_A] |= val
+        self.update_zn_flag(self.regs[REG_A])
+
     def branch(self, status_bit, branch_if_zero):
         do_branch = False
         if self.regs[REG_S] & status_bit == 0:
@@ -327,6 +382,14 @@ class Emulator:
                 branch_addr -= 256
             self.prgm_ctr += branch_addr
 
+    def shift_right(self, addr_mode):
+        if addr_mode == ACCUMULATOR:
+            self.regs[REG_A] >>= 1
+            self.update_zn_flag(self.regs[REG_A])
+        else:
+            addr, _ = self.get_addr_val(addr_mode)
+            self.mem[addr] >>= 1
+            self.update_zn_flag(self.mem[addr])
 
     def run(self):
         while True:
