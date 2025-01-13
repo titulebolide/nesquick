@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import binascii
 
 REG_A = 0
 REG_X = 1
@@ -31,7 +32,8 @@ def byte_not(val):
     return ~val%256
 
 class Emulator:
-    def __init__(self):
+    def __init__(self, lst):
+        self.lst = lst
         self.prgm_start = 0x0800
         self.prgm_file = "test.bin"
 
@@ -48,7 +50,9 @@ class Emulator:
 
         # operation, nbytes
         self.opcodes = {
-            0x00: [lambda oc : None, 2**18], # BRK : a big nbbyte will cause the pc to overflow and the program to stop
+            0x00: [lambda oc: None, 2**18], # BRK : a big nbbyte will cause the pc to overflow and the program to stop
+
+            0xea: [lambda oc: None, 1], # NOP
             
             ## ADD
             0x69: [lambda oc: self.adc(IMMEDIATE), 2],
@@ -59,6 +63,16 @@ class Emulator:
             0x79: [lambda oc: self.adc(ABSOLUTE_Y), 3],
             0x61: [lambda oc: self.adc(PRE_INDEX_INDIRECT), 2],
             0x71: [lambda oc: self.adc(POST_INDEX_INDIRECT), 2],
+
+            ## SUBSTRACT - SBC
+            0xe9: [lambda oc: self.sbc(IMMEDIATE), 2],
+            0xe5: [lambda oc: self.sbc(ZEROPAGE), 2],
+            0xf5: [lambda oc: self.sbc(ZEROPAGE_X), 2],
+            0xed: [lambda oc: self.sbc(ABSOLUTE), 3],
+            0xfd: [lambda oc: self.sbc(ABSOLUTE_X), 3],
+            0xf9: [lambda oc: self.sbc(ABSOLUTE_Y), 3],
+            0xe1: [lambda oc: self.sbc(PRE_INDEX_INDIRECT), 2],
+            0xf1: [lambda oc: self.sbc(POST_INDEX_INDIRECT), 2],
 
             ## AND
             0x29: [lambda oc: self.and_(IMMEDIATE), 2],
@@ -92,11 +106,11 @@ class Emulator:
             0x78: [lambda oc: self.set_status_bit(STATUS_INTER, True), 1], # SEI
 
             ## BIT SHIFT
-            0x4a: [lambda oc: self.shift_right(ACCUMULATOR), 2], # LSR
+            0x4a: [lambda oc: self.shift_right(ACCUMULATOR), 1], # LSR
             0x46: [lambda oc: self.shift_right(ZEROPAGE), 2],
             0x56: [lambda oc: self.shift_right(ZEROPAGE_X), 2],
-            0x4e: [lambda oc: self.shift_right(ABSOLUTE), 2],
-            0x5e: [lambda oc: self.shift_right(ABSOLUTE_X), 2],
+            0x4e: [lambda oc: self.shift_right(ABSOLUTE), 3],
+            0x5e: [lambda oc: self.shift_right(ABSOLUTE_X), 3],
 
             ## LOADS
             0xa9: [lambda oc: self.ld(REG_A, IMMEDIATE), 2],
@@ -175,11 +189,16 @@ class Emulator:
 
 
             ## INCREASE / DECREASE
-            0xca: [lambda oc: self.in_de_(REG_X, sign_plus=False), 1], #DEX
-            0x88: [lambda oc: self.in_de_(REG_Y, sign_plus=False), 1], #DEY
+            0xca: [lambda oc: self.in_de_reg(REG_X, sign_plus=False), 1], #DEX
+            0x88: [lambda oc: self.in_de_reg(REG_Y, sign_plus=False), 1], #DEY
 
-            0xe8: [lambda oc: self.in_de_(REG_X, sign_plus=True), 1], # INX
-            0xc8: [lambda oc: self.in_de_(REG_Y, sign_plus=True), 1], # INY
+            0xe8: [lambda oc: self.in_de_reg(REG_X, sign_plus=True), 1], # INX
+            0xc8: [lambda oc: self.in_de_reg(REG_Y, sign_plus=True), 1], # INY
+
+            0xc6: [lambda oc: self.in_de_mem(ZEROPAGE, sign_plus=False), 2], # DEC
+            0xd6: [lambda oc: self.in_de_mem(ZEROPAGE_X, sign_plus=False), 2], # DEC
+            0xce: [lambda oc: self.in_de_mem(ABSOLUTE, sign_plus=False), 3], # DEC
+            0xde: [lambda oc: self.in_de_mem(ABSOLUTE_X, sign_plus=False), 3], # DEC
 
 
             ## BRANCH
@@ -199,8 +218,9 @@ class Emulator:
             0x6c: [lambda oc: self.jmp(INDIRECT), 0], # JMP
             0x20: [self.jsr, 0], # JSR
             0x60: [self.rts, 0], # RTS
-
         }
+        print(len(self.opcodes))
+        exit(0)
 
     def set_status_bit(self, status_bit, on):
         if on:
@@ -280,7 +300,6 @@ class Emulator:
     
     def jmp(self, addr_mode):
         addr, _ = self.get_addr_val(addr_mode)
-        print(hex(addr))
         self.prgm_ctr = addr
             
     def stack_push(self, val):
@@ -342,7 +361,7 @@ class Emulator:
         diff = self.regs[reg] - val
         self.update_zn_flag(diff) #status_zero goes to 0 if equality
 
-    def in_de_(self, reg, sign_plus=True):
+    def in_de_reg(self, reg, sign_plus):
         # increase or decrease handler
         if sign_plus:
             self.regs[reg] += 1
@@ -351,12 +370,32 @@ class Emulator:
         self.regs[reg] %= 256
         self.update_zn_flag(self.regs[reg])
 
-    def adc(self, addr_mode):
-        _, val = self.get_addr_val(addr_mode)
+    def in_de_mem(self, addr_mode, sign_plus):
+        addr, _ = self.get_addr_val(addr_mode)
+        if sign_plus:
+            self.mem[addr] += 1
+        else:
+            self.mem[addr] -= 1
+        self.mem[addr] %= 256
+        self.update_zn_flag(self.mem[addr])
+
+    def add_val_to_acc_carry(self, val):
+        if self.regs[REG_S] & STATUS_CARRY != 0:
+            # there is a carry
+            val += 1
         self.regs[REG_A] += val
         self.set_status_bit(STATUS_CARRY, self.regs[REG_A] > 255)
         self.regs[REG_A] %= 256
         self.update_zn_flag(self.regs[REG_A])
+
+    def adc(self, addr_mode):
+        _, val = self.get_addr_val(addr_mode)
+        self.add_val_to_acc_carry(val)
+
+    def sbc(self, addr_mode):
+        # use two's complement https://stackoverflow.com/a/41253661
+        _, val = self.get_addr_val(addr_mode)
+        self.add_val_to_acc_carry(byte_not(val))
 
     def and_(self, addr_mode):
         _, val = self.get_addr_val(addr_mode)
@@ -392,6 +431,7 @@ class Emulator:
             self.update_zn_flag(self.mem[addr])
 
     def run(self):
+        iter = 0
         while True:
             opcode = self.mem[self.prgm_ctr]
             if opcode == 0x00:
@@ -403,9 +443,15 @@ class Emulator:
             func(opcode)
             self.prgm_ctr += nbytes
             self.dbg()
+            if iter % 500 == 0:
+                self.display_mem()
+            iter += 1
 
     def dbg(self):
+        print()
+        print(self.lst.get_inst(self.prgm_ctr))
         print("PC :", hex(self.prgm_ctr),
+              "\tinst :", hex(self.mem[self.prgm_ctr]),
               "\tA :", hex(self.regs[REG_A]),
               "\tX :", hex(self.regs[REG_X]),
               "\tY :", hex(self.regs[REG_Y]),
@@ -415,11 +461,39 @@ class Emulator:
     def display_mem(self):
         # 32 x 32 from 0x0200 to 0x05ff
         mat = np.array(self.mem[0x0200:0x0600]).reshape((32,32))
-        print(mat.shape)
         plt.imshow(mat)
         plt.show()
 
 
-e = Emulator()
+def lst_addr_to_val(str_addr):
+    data = binascii.unhexlify(str_addr)
+    val = 0
+    for b in data:
+        val = val*256 + b
+    return val
+
+class LstManager:
+    def __init__(self):
+        self.inst_map = {}
+        with open("test.lst", "r") as f:
+            
+            for l in f.readlines():
+                if l[0] != '0':
+                    continue
+                addr = lst_addr_to_val(l[0:6])
+                inst = l[11:].rstrip("\n").rstrip().lstrip()
+                if len(inst) == 0:
+                    continue
+                self.inst_map[addr] = inst
+
+    def get_inst(self, addr):
+        prgm_addr = addr - 0x0800
+        if prgm_addr not in self.inst_map:
+            return "NOP"
+        return self.inst_map[prgm_addr]
+
+l = LstManager()
+
+e = Emulator(l)
 e.run()
 e.display_mem()
