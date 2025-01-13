@@ -1,6 +1,10 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import binascii
+import threading
+import random
+import time
 
 REG_A = 0
 REG_X = 1
@@ -31,8 +35,9 @@ STATUS_CARRY = 0b00000001
 def byte_not(val):
     return ~val%256
 
-class Emulator:
+class Emulator(threading.Thread):
     def __init__(self, lst):
+        super().__init__()
         self.lst = lst
         self.prgm_start = 0x0800
         self.prgm_file = "test.bin"
@@ -53,6 +58,10 @@ class Emulator:
             0x00: [lambda oc: None, 2**18], # BRK : a big nbbyte will cause the pc to overflow and the program to stop
 
             0xea: [lambda oc: None, 1], # NOP
+
+            # BIT TEST
+            0x24: [lambda oc: self.bit(ZEROPAGE), 2],
+            0x2c: [lambda oc: self.bit(ABSOLUTE), 3],
             
             ## ADD
             0x69: [lambda oc: self.adc(IMMEDIATE), 2],
@@ -219,8 +228,6 @@ class Emulator:
             0x20: [self.jsr, 0], # JSR
             0x60: [self.rts, 0], # RTS
         }
-        print(len(self.opcodes))
-        exit(0)
 
     def set_status_bit(self, status_bit, on):
         if on:
@@ -336,6 +343,14 @@ class Emulator:
             # for REG_S it is already handled!
             self.update_zn_flag(val)
 
+    def bit(self, addr_mode):
+        # https://www.masswerk.at/6502/6502_instruction_set.html#bitcompare
+        acc = self.regs[REG_A]
+        _, ope = self.get_addr_val(addr_mode)
+        self.set_status_bit(STATUS_ZERO, acc & ope == 0)
+        self.set_status_bit(STATUS_NEG, ope & 0b10000000 != 0)
+        self.set_status_bit(STATUS_OVFLO, ope & 0b01000000 != 0)
+
     def ld(self, reg, addr_mode):
         # load accumulator
         _, val = self.get_addr_val(addr_mode)
@@ -433,6 +448,8 @@ class Emulator:
     def run(self):
         iter = 0
         while True:
+            e.mem[0xfe] = int(random.random()*32) # RANDOM GEN
+
             opcode = self.mem[self.prgm_ctr]
             if opcode == 0x00:
                 # TODO : handle BRK in a better way (raise interrupt flag)
@@ -443,9 +460,8 @@ class Emulator:
             func(opcode)
             self.prgm_ctr += nbytes
             self.dbg()
-            if iter % 500 == 0:
-                self.display_mem()
             iter += 1
+            time.sleep(0.0001)
 
     def dbg(self):
         print()
@@ -463,6 +479,10 @@ class Emulator:
         mat = np.array(self.mem[0x0200:0x0600]).reshape((32,32))
         plt.imshow(mat)
         plt.show()
+
+    def get_display_mat(self):
+        mat = np.array(self.mem[0x0200:0x0600]).reshape((32,32))
+        return mat
 
 
 def lst_addr_to_val(str_addr):
@@ -491,9 +511,58 @@ class LstManager:
         if prgm_addr not in self.inst_map:
             return "NOP"
         return self.inst_map[prgm_addr]
+    
+class AnimatedImshow:
+    def __init__(self, data_provider, interval=200):
+        """
+        Initialize the AnimatedImshow class.
+
+        Parameters:
+        - data_provider: An instance of DataProvider.
+        - interval: The delay between frames in milliseconds.
+        - cmap: The colormap to use for the imshow.
+        """
+        self.data_provider = data_provider
+        self.interval = interval
+        self.fig, self.ax = plt.subplots()
+        self.im = self.ax.imshow(np.random.rand(32,32)) # if i don't use a random init vector it don't work???
+
+    def update(self, frame):
+        """
+        Update the image for the given frame.
+
+        Parameters:
+        - frame: The current frame index.
+        """
+        mat = self.data_provider.get_display_mat()
+        self.im.set_array(mat)
+        return [self.im]
+
+    def animate(self):
+        """
+        Create and display the animation.
+        """
+        self.ani = animation.FuncAnimation(
+            self.fig, self.update, interval=self.interval, blit=True)
+        plt.show()
+
 
 l = LstManager()
 
 e = Emulator(l)
-e.run()
-e.display_mem()
+m = AnimatedImshow(e)
+
+
+from pynput import keyboard
+def on_press(key):
+    try:
+       e.mem[0xff] = ord(key.char)
+    except AttributeError:
+        pass
+listener = keyboard.Listener(
+    on_press=on_press)
+listener.start()
+
+e.start()
+m.animate()
+listener.join()
