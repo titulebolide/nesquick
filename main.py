@@ -6,6 +6,9 @@ import threading
 import random
 import time
 
+plt.rcParams['keymap.save'].remove('s')
+plt.rcParams['keymap.quit'].remove('q')
+
 REG_A = 0
 REG_X = 1
 REG_Y = 2
@@ -208,6 +211,11 @@ class Emulator(threading.Thread):
             0xd6: [lambda oc: self.in_de_mem(ZEROPAGE_X, sign_plus=False), 2], # DEC
             0xce: [lambda oc: self.in_de_mem(ABSOLUTE, sign_plus=False), 3], # DEC
             0xde: [lambda oc: self.in_de_mem(ABSOLUTE_X, sign_plus=False), 3], # DEC
+
+            0xe6: [lambda oc: self.in_de_mem(ZEROPAGE, sign_plus=True), 2], # INC
+            0xf6: [lambda oc: self.in_de_mem(ZEROPAGE_X, sign_plus=True), 2], # INC
+            0xee: [lambda oc: self.in_de_mem(ABSOLUTE, sign_plus=True), 3], # INC
+            0xfe: [lambda oc: self.in_de_mem(ABSOLUTE_X, sign_plus=True), 3], # INC
 
 
             ## BRANCH
@@ -437,13 +445,18 @@ class Emulator(threading.Thread):
             self.prgm_ctr += branch_addr
 
     def shift_right(self, addr_mode):
+        # carry if lsb set
+        carry_on = False
         if addr_mode == ACCUMULATOR:
+            carry_on = (self.regs[REG_A] & 0b00000001 != 0)
             self.regs[REG_A] >>= 1
             self.update_zn_flag(self.regs[REG_A])
         else:
             addr, _ = self.get_addr_val(addr_mode)
+            carry_on = (self.mem[addr] & 0b00000001 != 0)
             self.mem[addr] >>= 1
             self.update_zn_flag(self.mem[addr])
+        self.set_status_bit(STATUS_CARRY, carry_on)
 
     def run(self):
         iter = 0
@@ -461,7 +474,7 @@ class Emulator(threading.Thread):
             self.prgm_ctr += nbytes
             self.dbg()
             iter += 1
-            time.sleep(0.0001)
+            time.sleep(0.002)
 
     def dbg(self):
         print()
@@ -513,7 +526,7 @@ class LstManager:
         return self.inst_map[prgm_addr]
     
 class AnimatedImshow:
-    def __init__(self, data_provider, interval=200):
+    def __init__(self, data_provider, interval=50):
         """
         Initialize the AnimatedImshow class.
 
