@@ -38,6 +38,12 @@ STATUS_CARRY = 0b00000001
 def byte_not(val):
     return ~val%256
 
+def dec2hex(val):
+    val = hex(val)[2:]
+    if len(val) == 1:
+        val = "0" + val
+    return val
+
 class Emulator(threading.Thread):
     def __init__(self, lst):
         super().__init__()
@@ -422,7 +428,7 @@ class Emulator(threading.Thread):
 
     def and_(self, addr_mode):
         _, val = self.get_addr_val(addr_mode)
-        self.regs[REG_A] |= val
+        self.regs[REG_A] &= val
         self.update_zn_flag(self.regs[REG_A])
 
     def or_(self, addr_mode):
@@ -461,7 +467,7 @@ class Emulator(threading.Thread):
     def run(self):
         iter = 0
         while True:
-            e.mem[0xfe] = int(random.random()*32) # RANDOM GEN
+            e.mem[0xfe] = int(random.random()*256) # RANDOM GEN
 
             opcode = self.mem[self.prgm_ctr]
             if opcode == 0x00:
@@ -471,14 +477,15 @@ class Emulator(threading.Thread):
                 raise Exception(f"Unknown opcode {hex(opcode)}")
             func, nbytes = self.opcodes[opcode]
             func(opcode)
-            self.prgm_ctr += nbytes
             self.dbg()
+            self.prgm_ctr += nbytes
             iter += 1
             time.sleep(0.002)
 
     def dbg(self):
         print()
-        print(self.lst.get_inst(self.prgm_ctr))
+        inst = self.lst.get_inst(self.prgm_ctr)
+        print(inst)
         print("PC :", hex(self.prgm_ctr),
               "\tinst :", hex(self.mem[self.prgm_ctr]),
               "\tA :", hex(self.regs[REG_A]),
@@ -486,6 +493,9 @@ class Emulator(threading.Thread):
               "\tY :", hex(self.regs[REG_Y]),
               "\tS :", bin(self.regs[REG_S]),
               "\tSP :", hex(self.stack_ptr))
+        print("mem: ", *[dec2hex(i) for i in self.mem[0x00:0x10]])
+        if "bkpt" in inst:
+            input()
 
     def display_mem(self):
         # 32 x 32 from 0x0200 to 0x05ff
