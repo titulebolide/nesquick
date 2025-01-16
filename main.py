@@ -324,13 +324,13 @@ class Emulator(threading.Thread):
         self.prgm_ctr = addr
             
     def stack_push(self, val):
-        addr = self.stack_ptr + 0x01 * 255
+        addr = self.stack_ptr + 0x0100
         self.mem[addr] = val
         self.stack_ptr -= 1
 
     def stack_pull(self):
         self.stack_ptr += 1
-        addr = self.stack_ptr + 0x01 * 255
+        addr = self.stack_ptr + 0x0100
         return self.mem[addr]
 
     def jsr(self, opcode):
@@ -575,17 +575,27 @@ l = LstManager()
 e = Emulator(l)
 m = AnimatedImshow(e)
 
+import evdev
+dev = evdev.InputDevice('/dev/input/event4')
 
-from pynput import keyboard
-def on_press(key):
-    try:
-       e.mem[0xff] = ord(key.char)
-    except AttributeError:
-        pass
-listener = keyboard.Listener(
-    on_press=on_press)
-listener.start()
+print(dev)
+
+def readkb():
+    for event in dev.read_loop():
+        if event.type == evdev.ecodes.EV_KEY:
+
+            key = evdev.ecodes.KEY[event.code][4:]
+            if len(key) != 1:
+                continue
+            if event.value != 1: #press down
+                continue
+            asciival = ord(key.lower())
+            e.mem[0xff] = asciival
+
+kbthread = threading.Thread(target=readkb)
+kbthread.start()
+
 
 e.start()
 m.animate()
-listener.join()
+kbthread.join()
