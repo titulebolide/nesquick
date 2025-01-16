@@ -64,181 +64,181 @@ class Emulator(threading.Thread):
 
         # operation, nbytes
         self.opcodes = {
-            0x00: [lambda oc: None, 2**18], # BRK : a big nbbyte will cause the pc to overflow and the program to stop
+            0x00: [lambda : None, 2**18], # BRK : a big nbbyte will cause the pc to overflow and the program to stop
 
-            0xea: [lambda oc: None, 1], # NOP
+            0xea: [lambda : None, 1], # NOP
 
             # BIT TEST
-            0x24: [lambda oc: self.bit(ZEROPAGE), 2],
-            0x2c: [lambda oc: self.bit(ABSOLUTE), 3],
+            0x24: [lambda : self.bit(ZEROPAGE), 2],
+            0x2c: [lambda : self.bit(ABSOLUTE), 3],
             
             ## ADD
-            0x69: [lambda oc: self.adc(IMMEDIATE), 2],
-            0x65: [lambda oc: self.adc(ZEROPAGE), 2], 
-            0x75: [lambda oc: self.adc(ZEROPAGE_X), 2],
-            0x6d: [lambda oc: self.adc(ABSOLUTE), 3],
-            0x7d: [lambda oc: self.adc(ABSOLUTE_X), 3],
-            0x79: [lambda oc: self.adc(ABSOLUTE_Y), 3],
-            0x61: [lambda oc: self.adc(PRE_INDEX_INDIRECT), 2],
-            0x71: [lambda oc: self.adc(POST_INDEX_INDIRECT), 2],
+            0x69: [lambda : self.adc(IMMEDIATE), 2],
+            0x65: [lambda : self.adc(ZEROPAGE), 2], 
+            0x75: [lambda : self.adc(ZEROPAGE_X), 2],
+            0x6d: [lambda : self.adc(ABSOLUTE), 3],
+            0x7d: [lambda : self.adc(ABSOLUTE_X), 3],
+            0x79: [lambda : self.adc(ABSOLUTE_Y), 3],
+            0x61: [lambda : self.adc(PRE_INDEX_INDIRECT), 2],
+            0x71: [lambda : self.adc(POST_INDEX_INDIRECT), 2],
 
             ## SUBSTRACT - SBC
-            0xe9: [lambda oc: self.sbc(IMMEDIATE), 2],
-            0xe5: [lambda oc: self.sbc(ZEROPAGE), 2],
-            0xf5: [lambda oc: self.sbc(ZEROPAGE_X), 2],
-            0xed: [lambda oc: self.sbc(ABSOLUTE), 3],
-            0xfd: [lambda oc: self.sbc(ABSOLUTE_X), 3],
-            0xf9: [lambda oc: self.sbc(ABSOLUTE_Y), 3],
-            0xe1: [lambda oc: self.sbc(PRE_INDEX_INDIRECT), 2],
-            0xf1: [lambda oc: self.sbc(POST_INDEX_INDIRECT), 2],
+            0xe9: [lambda : self.sbc(IMMEDIATE), 2],
+            0xe5: [lambda : self.sbc(ZEROPAGE), 2],
+            0xf5: [lambda : self.sbc(ZEROPAGE_X), 2],
+            0xed: [lambda : self.sbc(ABSOLUTE), 3],
+            0xfd: [lambda : self.sbc(ABSOLUTE_X), 3],
+            0xf9: [lambda : self.sbc(ABSOLUTE_Y), 3],
+            0xe1: [lambda : self.sbc(PRE_INDEX_INDIRECT), 2],
+            0xf1: [lambda : self.sbc(POST_INDEX_INDIRECT), 2],
 
             ## AND
-            0x29: [lambda oc: self.and_(IMMEDIATE), 2],
-            0x25: [lambda oc: self.and_(ZEROPAGE), 2], 
-            0x35: [lambda oc: self.and_(ZEROPAGE_X), 2],
-            0x2D: [lambda oc: self.and_(ABSOLUTE), 3],
-            0x3D: [lambda oc: self.and_(ABSOLUTE_X), 3],
-            0x39: [lambda oc: self.and_(ABSOLUTE_Y), 3],
-            0x21: [lambda oc: self.and_(PRE_INDEX_INDIRECT), 2],
-            0x31: [lambda oc: self.and_(POST_INDEX_INDIRECT), 2],
+            0x29: [lambda : self.and_(IMMEDIATE), 2],
+            0x25: [lambda : self.and_(ZEROPAGE), 2], 
+            0x35: [lambda : self.and_(ZEROPAGE_X), 2],
+            0x2D: [lambda : self.and_(ABSOLUTE), 3],
+            0x3D: [lambda : self.and_(ABSOLUTE_X), 3],
+            0x39: [lambda : self.and_(ABSOLUTE_Y), 3],
+            0x21: [lambda : self.and_(PRE_INDEX_INDIRECT), 2],
+            0x31: [lambda : self.and_(POST_INDEX_INDIRECT), 2],
 
             ## OR
-            0x09: [lambda oc: self.or_(IMMEDIATE), 2],
-            0x05: [lambda oc: self.or_(ZEROPAGE), 2], 
-            0x15: [lambda oc: self.or_(ZEROPAGE_X), 2],
-            0x0d: [lambda oc: self.or_(ABSOLUTE), 3],
-            0x1d: [lambda oc: self.or_(ABSOLUTE_X), 3],
-            0x19: [lambda oc: self.or_(ABSOLUTE_Y), 3],
-            0x01: [lambda oc: self.or_(PRE_INDEX_INDIRECT), 2],
-            0x11: [lambda oc: self.or_(POST_INDEX_INDIRECT), 2],
+            0x09: [lambda : self.or_(IMMEDIATE), 2],
+            0x05: [lambda : self.or_(ZEROPAGE), 2], 
+            0x15: [lambda : self.or_(ZEROPAGE_X), 2],
+            0x0d: [lambda : self.or_(ABSOLUTE), 3],
+            0x1d: [lambda : self.or_(ABSOLUTE_X), 3],
+            0x19: [lambda : self.or_(ABSOLUTE_Y), 3],
+            0x01: [lambda : self.or_(PRE_INDEX_INDIRECT), 2],
+            0x11: [lambda : self.or_(POST_INDEX_INDIRECT), 2],
 
             ## CLEAR STATUS
-            0x18: [lambda oc: self.set_status_bit(STATUS_CARRY, False), 1], # CLC
-            0xd8: [lambda oc: self.set_status_bit(STATUS_DEC, False), 1], # CLD
-            0x58: [lambda oc: self.set_status_bit(STATUS_INTER, False), 1], # CLI
-            0xb8: [lambda oc: self.set_status_bit(STATUS_OVFLO, False), 1], # CLV
+            0x18: [lambda : self.set_status_bit(STATUS_CARRY, False), 1], # CLC
+            0xd8: [lambda : self.set_status_bit(STATUS_DEC, False), 1], # CLD
+            0x58: [lambda : self.set_status_bit(STATUS_INTER, False), 1], # CLI
+            0xb8: [lambda : self.set_status_bit(STATUS_OVFLO, False), 1], # CLV
 
             ## SET STATUS
-            0x38: [lambda oc: self.set_status_bit(STATUS_CARRY, True), 1], # SEC
-            0xf8: [lambda oc: self.set_status_bit(STATUS_DEC, True), 1], # SED
-            0x78: [lambda oc: self.set_status_bit(STATUS_INTER, True), 1], # SEI
+            0x38: [lambda : self.set_status_bit(STATUS_CARRY, True), 1], # SEC
+            0xf8: [lambda : self.set_status_bit(STATUS_DEC, True), 1], # SED
+            0x78: [lambda : self.set_status_bit(STATUS_INTER, True), 1], # SEI
 
             ## BIT SHIFT
-            0x4a: [lambda oc: self.shift_right(ACCUMULATOR), 1], # LSR
-            0x46: [lambda oc: self.shift_right(ZEROPAGE), 2],
-            0x56: [lambda oc: self.shift_right(ZEROPAGE_X), 2],
-            0x4e: [lambda oc: self.shift_right(ABSOLUTE), 3],
-            0x5e: [lambda oc: self.shift_right(ABSOLUTE_X), 3],
+            0x4a: [lambda : self.shift_right(ACCUMULATOR), 1], # LSR
+            0x46: [lambda : self.shift_right(ZEROPAGE), 2],
+            0x56: [lambda : self.shift_right(ZEROPAGE_X), 2],
+            0x4e: [lambda : self.shift_right(ABSOLUTE), 3],
+            0x5e: [lambda : self.shift_right(ABSOLUTE_X), 3],
 
             ## LOADS
-            0xa9: [lambda oc: self.ld(REG_A, IMMEDIATE), 2],
-            0xa5: [lambda oc: self.ld(REG_A, ZEROPAGE), 2],
-            0xb5: [lambda oc: self.ld(REG_A, ZEROPAGE_X), 2],
-            0xad: [lambda oc: self.ld(REG_A, ABSOLUTE), 3],
-            0xbd: [lambda oc: self.ld(REG_A, ABSOLUTE_X), 3],
-            0xb9: [lambda oc: self.ld(REG_A, ABSOLUTE_Y), 3],
-            0xa1: [lambda oc: self.ld(REG_A, PRE_INDEX_INDIRECT), 2],
-            0xb1: [lambda oc: self.ld(REG_A, POST_INDEX_INDIRECT), 2],
+            0xa9: [lambda : self.ld(REG_A, IMMEDIATE), 2],
+            0xa5: [lambda : self.ld(REG_A, ZEROPAGE), 2],
+            0xb5: [lambda : self.ld(REG_A, ZEROPAGE_X), 2],
+            0xad: [lambda : self.ld(REG_A, ABSOLUTE), 3],
+            0xbd: [lambda : self.ld(REG_A, ABSOLUTE_X), 3],
+            0xb9: [lambda : self.ld(REG_A, ABSOLUTE_Y), 3],
+            0xa1: [lambda : self.ld(REG_A, PRE_INDEX_INDIRECT), 2],
+            0xb1: [lambda : self.ld(REG_A, POST_INDEX_INDIRECT), 2],
 
-            0xa2: [lambda oc: self.ld(REG_X, IMMEDIATE), 2],
-            0xa6: [lambda oc: self.ld(REG_X, ZEROPAGE), 2],
-            0xb6: [lambda oc: self.ld(REG_X, ZEROPAGE_Y), 2],
-            0xae: [lambda oc: self.ld(REG_X, ABSOLUTE), 3],
-            0xbe: [lambda oc: self.ld(REG_X, ABSOLUTE_Y), 3],
+            0xa2: [lambda : self.ld(REG_X, IMMEDIATE), 2],
+            0xa6: [lambda : self.ld(REG_X, ZEROPAGE), 2],
+            0xb6: [lambda : self.ld(REG_X, ZEROPAGE_Y), 2],
+            0xae: [lambda : self.ld(REG_X, ABSOLUTE), 3],
+            0xbe: [lambda : self.ld(REG_X, ABSOLUTE_Y), 3],
 
-            0xa0: [lambda oc: self.ld(REG_Y, IMMEDIATE), 2],
-            0xa4: [lambda oc: self.ld(REG_Y, ZEROPAGE), 2],
-            0xb4: [lambda oc: self.ld(REG_Y, ZEROPAGE_X), 2],
-            0xac: [lambda oc: self.ld(REG_Y, ABSOLUTE), 3],
-            0xbc: [lambda oc: self.ld(REG_Y, ABSOLUTE_X), 3],
+            0xa0: [lambda : self.ld(REG_Y, IMMEDIATE), 2],
+            0xa4: [lambda : self.ld(REG_Y, ZEROPAGE), 2],
+            0xb4: [lambda : self.ld(REG_Y, ZEROPAGE_X), 2],
+            0xac: [lambda : self.ld(REG_Y, ABSOLUTE), 3],
+            0xbc: [lambda : self.ld(REG_Y, ABSOLUTE_X), 3],
 
 
             ## STORE
-            0x85: [lambda oc: self.st(REG_A, ZEROPAGE), 2],
-            0x95: [lambda oc: self.st(REG_A, ZEROPAGE_X), 2],
-            0x8d: [lambda oc: self.st(REG_A, ABSOLUTE), 3],
-            0x9d: [lambda oc: self.st(REG_A, ABSOLUTE_X), 3],
-            0x99: [lambda oc: self.st(REG_A, ABSOLUTE_Y), 3],
-            0x81: [lambda oc: self.st(REG_A, PRE_INDEX_INDIRECT), 2],
-            0x91: [lambda oc: self.st(REG_A, POST_INDEX_INDIRECT), 2],
+            0x85: [lambda : self.st(REG_A, ZEROPAGE), 2],
+            0x95: [lambda : self.st(REG_A, ZEROPAGE_X), 2],
+            0x8d: [lambda : self.st(REG_A, ABSOLUTE), 3],
+            0x9d: [lambda : self.st(REG_A, ABSOLUTE_X), 3],
+            0x99: [lambda : self.st(REG_A, ABSOLUTE_Y), 3],
+            0x81: [lambda : self.st(REG_A, PRE_INDEX_INDIRECT), 2],
+            0x91: [lambda : self.st(REG_A, POST_INDEX_INDIRECT), 2],
 
-            0x86: [lambda oc: self.st(REG_X, ZEROPAGE), 2],
-            0x96: [lambda oc: self.st(REG_X, ZEROPAGE_Y), 2],
-            0x8e: [lambda oc: self.st(REG_X, ABSOLUTE), 3],
+            0x86: [lambda : self.st(REG_X, ZEROPAGE), 2],
+            0x96: [lambda : self.st(REG_X, ZEROPAGE_Y), 2],
+            0x8e: [lambda : self.st(REG_X, ABSOLUTE), 3],
 
-            0x84: [lambda oc: self.st(REG_Y, ZEROPAGE), 2],
-            0x94: [lambda oc: self.st(REG_Y, ZEROPAGE_X), 2],
-            0x8c: [lambda oc: self.st(REG_Y, ABSOLUTE), 3],
+            0x84: [lambda : self.st(REG_Y, ZEROPAGE), 2],
+            0x94: [lambda : self.st(REG_Y, ZEROPAGE_X), 2],
+            0x8c: [lambda : self.st(REG_Y, ABSOLUTE), 3],
 
 
             ## TRANSFER
-            0xaa: [lambda oc: self.tr(REG_A, REG_X), 1], # TAX
-            0xa8: [lambda oc: self.tr(REG_A, REG_Y), 1], # TAY
-            0xba: [lambda oc: self.tr(REG_S, REG_X), 1], # TSX
-            0x8a: [lambda oc: self.tr(REG_X, REG_A), 1], # TXA
-            0x9a: [lambda oc: self.tr(REG_X, REG_S), 1], # TXS
-            0x98: [lambda oc: self.tr(REG_Y, REG_A), 1], # TYA
+            0xaa: [lambda : self.tr(REG_A, REG_X), 1], # TAX
+            0xa8: [lambda : self.tr(REG_A, REG_Y), 1], # TAY
+            0xba: [lambda : self.tr(REG_S, REG_X), 1], # TSX
+            0x8a: [lambda : self.tr(REG_X, REG_A), 1], # TXA
+            0x9a: [lambda : self.tr(REG_X, REG_S), 1], # TXS
+            0x98: [lambda : self.tr(REG_Y, REG_A), 1], # TYA
 
 
             ## COMPARE
-            0xc9: [lambda oc: self.cp(REG_A, IMMEDIATE), 2],
-            0xc5: [lambda oc: self.cp(REG_A, ZEROPAGE), 2],
-            0xd5: [lambda oc: self.cp(REG_A, ZEROPAGE_X), 2],
-            0xcd: [lambda oc: self.cp(REG_A, ABSOLUTE), 3],
-            0xdd: [lambda oc: self.cp(REG_A, ABSOLUTE_X), 3],
-            0xd9: [lambda oc: self.cp(REG_A, ABSOLUTE_Y), 3],
-            0xc1: [lambda oc: self.cp(REG_A, PRE_INDEX_INDIRECT), 2],
-            0xd1: [lambda oc: self.cp(REG_A, POST_INDEX_INDIRECT), 2],
+            0xc9: [lambda : self.cp(REG_A, IMMEDIATE), 2],
+            0xc5: [lambda : self.cp(REG_A, ZEROPAGE), 2],
+            0xd5: [lambda : self.cp(REG_A, ZEROPAGE_X), 2],
+            0xcd: [lambda : self.cp(REG_A, ABSOLUTE), 3],
+            0xdd: [lambda : self.cp(REG_A, ABSOLUTE_X), 3],
+            0xd9: [lambda : self.cp(REG_A, ABSOLUTE_Y), 3],
+            0xc1: [lambda : self.cp(REG_A, PRE_INDEX_INDIRECT), 2],
+            0xd1: [lambda : self.cp(REG_A, POST_INDEX_INDIRECT), 2],
 
-            0xe0: [lambda oc: self.cp(REG_X, IMMEDIATE), 2],
-            0xe4: [lambda oc: self.cp(REG_X, ZEROPAGE), 2],
-            0xec: [lambda oc: self.cp(REG_X, ABSOLUTE), 3],
+            0xe0: [lambda : self.cp(REG_X, IMMEDIATE), 2],
+            0xe4: [lambda : self.cp(REG_X, ZEROPAGE), 2],
+            0xec: [lambda : self.cp(REG_X, ABSOLUTE), 3],
 
-            0xc0: [lambda oc: self.cp(REG_Y, IMMEDIATE), 2],
-            0xc4: [lambda oc: self.cp(REG_Y, ZEROPAGE), 2],
-            0xcc: [lambda oc: self.cp(REG_Y, ABSOLUTE), 3],
+            0xc0: [lambda : self.cp(REG_Y, IMMEDIATE), 2],
+            0xc4: [lambda : self.cp(REG_Y, ZEROPAGE), 2],
+            0xcc: [lambda : self.cp(REG_Y, ABSOLUTE), 3],
 
 
             ## STACK PUSH/PULL
-            0x48: [lambda oc: self.ph(REG_A), 1], # PHA
-            0x68: [lambda oc: self.pl(REG_A), 1], # PLA
-            0x08: [lambda oc: self.ph(REG_S), 1], # PHP
-            0x28: [lambda oc: self.pl(REG_S), 1], # PLP
+            0x48: [lambda : self.ph(REG_A), 1], # PHA
+            0x68: [lambda : self.pl(REG_A), 1], # PLA
+            0x08: [lambda : self.ph(REG_S), 1], # PHP
+            0x28: [lambda : self.pl(REG_S), 1], # PLP
 
 
             ## INCREASE / DECREASE
-            0xca: [lambda oc: self.in_de_reg(REG_X, sign_plus=False), 1], #DEX
-            0x88: [lambda oc: self.in_de_reg(REG_Y, sign_plus=False), 1], #DEY
+            0xca: [lambda : self.in_de_reg(REG_X, sign_plus=False), 1], #DEX
+            0x88: [lambda : self.in_de_reg(REG_Y, sign_plus=False), 1], #DEY
 
-            0xe8: [lambda oc: self.in_de_reg(REG_X, sign_plus=True), 1], # INX
-            0xc8: [lambda oc: self.in_de_reg(REG_Y, sign_plus=True), 1], # INY
+            0xe8: [lambda : self.in_de_reg(REG_X, sign_plus=True), 1], # INX
+            0xc8: [lambda : self.in_de_reg(REG_Y, sign_plus=True), 1], # INY
 
-            0xc6: [lambda oc: self.in_de_mem(ZEROPAGE, sign_plus=False), 2], # DEC
-            0xd6: [lambda oc: self.in_de_mem(ZEROPAGE_X, sign_plus=False), 2], # DEC
-            0xce: [lambda oc: self.in_de_mem(ABSOLUTE, sign_plus=False), 3], # DEC
-            0xde: [lambda oc: self.in_de_mem(ABSOLUTE_X, sign_plus=False), 3], # DEC
+            0xc6: [lambda : self.in_de_mem(ZEROPAGE, sign_plus=False), 2], # DEC
+            0xd6: [lambda : self.in_de_mem(ZEROPAGE_X, sign_plus=False), 2], # DEC
+            0xce: [lambda : self.in_de_mem(ABSOLUTE, sign_plus=False), 3], # DEC
+            0xde: [lambda : self.in_de_mem(ABSOLUTE_X, sign_plus=False), 3], # DEC
 
-            0xe6: [lambda oc: self.in_de_mem(ZEROPAGE, sign_plus=True), 2], # INC
-            0xf6: [lambda oc: self.in_de_mem(ZEROPAGE_X, sign_plus=True), 2], # INC
-            0xee: [lambda oc: self.in_de_mem(ABSOLUTE, sign_plus=True), 3], # INC
-            0xfe: [lambda oc: self.in_de_mem(ABSOLUTE_X, sign_plus=True), 3], # INC
+            0xe6: [lambda : self.in_de_mem(ZEROPAGE, sign_plus=True), 2], # INC
+            0xf6: [lambda : self.in_de_mem(ZEROPAGE_X, sign_plus=True), 2], # INC
+            0xee: [lambda : self.in_de_mem(ABSOLUTE, sign_plus=True), 3], # INC
+            0xfe: [lambda : self.in_de_mem(ABSOLUTE_X, sign_plus=True), 3], # INC
 
 
             ## BRANCH
-            0xd0: [lambda oc: self.branch(STATUS_ZERO, True), 2], # BNE
-            0xf0: [lambda oc: self.branch(STATUS_ZERO, False), 2], # BEQ (inv of BNE)
-            0x90: [lambda oc: self.branch(STATUS_CARRY, True), 2], # BCC Branch Carry Clear
-            0xb0: [lambda oc: self.branch(STATUS_CARRY, False), 2], # BCS Branch Carry Set
-            0x30: [lambda oc: self.branch(STATUS_NEG, False), 2], # BMI Branch on result is negative (mi = minus)
-            0x10: [lambda oc: self.branch(STATUS_NEG, True), 2], # BPL Branch on result is positive (pl = plsu)
-            0x50: [lambda oc: self.branch(STATUS_OVFLO, True), 2], # BVC Branch on overflow clear
-            0x70: [lambda oc: self.branch(STATUS_OVFLO, False), 2], # BVS Branch on overflow set
+            0xd0: [lambda : self.branch(STATUS_ZERO, True), 2], # BNE
+            0xf0: [lambda : self.branch(STATUS_ZERO, False), 2], # BEQ (inv of BNE)
+            0x90: [lambda : self.branch(STATUS_CARRY, True), 2], # BCC Branch Carry Clear
+            0xb0: [lambda : self.branch(STATUS_CARRY, False), 2], # BCS Branch Carry Set
+            0x30: [lambda : self.branch(STATUS_NEG, False), 2], # BMI Branch on result is negative (mi = minus)
+            0x10: [lambda : self.branch(STATUS_NEG, True), 2], # BPL Branch on result is positive (pl = plsu)
+            0x50: [lambda : self.branch(STATUS_OVFLO, True), 2], # BVC Branch on overflow clear
+            0x70: [lambda : self.branch(STATUS_OVFLO, False), 2], # BVS Branch on overflow set
 
 
             ## JUMP
             # 0 byte shift because we handle the shift in the function call
-            0x4c: [lambda oc: self.jmp(ABSOLUTE), 0], # JMP
-            0x6c: [lambda oc: self.jmp(INDIRECT), 0], # JMP
+            0x4c: [lambda : self.jmp(ABSOLUTE), 0], # JMP
+            0x6c: [lambda : self.jmp(INDIRECT), 0], # JMP
             0x20: [self.jsr, 0], # JSR
             0x60: [self.rts, 0], # RTS
         }
@@ -333,11 +333,11 @@ class Emulator(threading.Thread):
         addr = self.stack_ptr + 0x0100
         return self.mem[addr]
 
-    def jsr(self, opcode):
+    def jsr(self):
         self.stack_push(self.prgm_ctr + 2)
         self.jmp(ABSOLUTE)
 
-    def rts(self, opcode):
+    def rts(self):
         addr = self.stack_pull()
         self.prgm_ctr = addr + 1
 
@@ -476,7 +476,7 @@ class Emulator(threading.Thread):
             if not opcode in self.opcodes:
                 raise Exception(f"Unknown opcode {hex(opcode)}")
             func, nbytes = self.opcodes[opcode]
-            func(opcode)
+            func()
             self.dbg()
             self.prgm_ctr += nbytes
             iter += 1
