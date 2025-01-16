@@ -269,6 +269,9 @@ class Emulator(threading.Thread):
             assert key not in seen_opcodes
             assert len(val) == 5
             seen_opcodes.append(key)
+            a,b,c,d,e = val
+            if e == YESEC:
+                assert b in (ABSOLUTE_X, ABSOLUTE_Y, POST_INDEX_INDIRECT)
 
     def set_status_bit(self, status_bit, on):
         if on:
@@ -277,14 +280,20 @@ class Emulator(threading.Thread):
             self.regs[REG_S] &= byte_not(status_bit)
 
     def get_addr_val(self, mode):
+        page_crossed = False
+        
         if mode in (ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y):
             addr = self.mem[self.prgm_ctr+1] + self.mem[self.prgm_ctr+2] * 256
+            base_page_no = addr >> 8 # high byte is page no
             if mode == ABSOLUTE_X:
                 addr += self.regs[REG_X]
                 addr %= 65536
             elif mode == ABSOLUTE_Y:
                 addr += self.regs[REG_Y]
                 addr %= 65536
+            new_page_no = addr >> 8
+            # page is crossed if page number has changed
+            page_crossed = (new_page_no != base_page_no)
 
         elif mode in (ZEROPAGE, ZEROPAGE_X, ZEROPAGE_Y):
             addr = self.mem[self.prgm_ctr+1]
@@ -300,7 +309,7 @@ class Emulator(threading.Thread):
             # where there is the lsb of the address we are looking for
             # the msb is at the next address
             # fist we recover the given implici addr:
-            implicit_addr, _ = self.get_addr_val(ABSOLUTE)
+            implicit_addr, _, _ = self.get_addr_val(ABSOLUTE)
             dest_addr_lsb = self.mem[implicit_addr]
             dest_addr_msb = self.mem[(implicit_addr + 1)%65536]
             addr = dest_addr_lsb + dest_addr_msb * 256
@@ -308,7 +317,7 @@ class Emulator(threading.Thread):
         elif mode == PRE_INDEX_INDIRECT:
             # or indexed indirect
             # implicit addr is a ZEROPAGE_X
-            implicit_addr, _ = self.get_addr_val(ZEROPAGE_X)
+            implicit_addr, _, _ = self.get_addr_val(ZEROPAGE_X)
             dest_addr_lsb = self.mem[implicit_addr]
             dest_addr_msb = self.mem[(implicit_addr + 1)%65536]
             addr = dest_addr_lsb + dest_addr_msb * 256
@@ -317,27 +326,30 @@ class Emulator(threading.Thread):
             # or indirect indexed
             # implicit addr is a ZEROPAGE
             # the address we found there is offset by REG_Y
-            implicit_addr, _ = self.get_addr_val(ZEROPAGE)
+            implicit_addr, _, _ = self.get_addr_val(ZEROPAGE)
             dest_addr_lsb = self.mem[implicit_addr]
             dest_addr_msb = self.mem[(implicit_addr + 1)%65536]
             addr = dest_addr_lsb + dest_addr_msb * 256
+            base_page_no = addr >> 8
             addr += self.regs[REG_Y]
             addr %= 65536
+            new_page_no = addr >> 8
+            page_crossed = (new_page_no != base_page_no)
             
         elif mode == ACCUMULATOR:
             val = self.regs[REG_A]
-            return None, val
+            return None, val, False
 
         elif mode == IMMEDIATE:
             val = self.mem[self.prgm_ctr+1]
-            return None, val
+            return None, val, False
 
         else:
             # relative addressing is only used for branching
             # implicit addressing is operation dependent
             raise Exception
         
-        return addr, self.mem[addr]
+        return addr, self.mem[addr], page_crossed
     
     def update_zn_flag(self, value):
         self.set_status_bit(STATUS_ZERO, value == 0)
@@ -496,6 +508,7 @@ class Emulator(threading.Thread):
         self.update_zn_flag(self.regs[REG_A])
 
     def branch(self, status_bit, branch_if_zero):
+        extra_cycles = 0
         do_branch = False
         if self.regs[REG_S] & status_bit == 0:
             do_branch = True
@@ -507,7 +520,15 @@ class Emulator(threading.Thread):
             if branch_addr & 0b10000000 != 0:
                 # negative number
                 branch_addr -= 256
+            base_page = self.prgm_ctr >> 8
             self.prgm_ctr += branch_addr
+            self.prgm_ctr %= 65536
+            new_page = self.prgm_ctr >> 8
+            if base_page == new_page:
+                extra_cycles = 1
+            else:
+                extra_cycles = 2
+        return extra_cycles
 
     def shift_right_memory(self, addr, val):
         # carry if lsb set
@@ -524,7 +545,6 @@ class Emulator(threading.Thread):
         self.set_status_bit(STATUS_CARRY, carry_on)
 
     def run(self):
-        iter = 0
         while True:
             e.mem[0xfe] = int(random.random()*256) # RANDOM GEN
 
@@ -535,15 +555,23 @@ class Emulator(threading.Thread):
             if not opcode in self.opcodes:
                 raise Exception(f"Unknown opcode {hex(opcode)}")
             func, addr_mode, nbytes, base_ncycle, extra_cycle_type = self.opcodes[opcode]
-            if addr_mode in (IMPLICIT, ACCUMULATOR):
-                func()
+            extra_cycle_nb = 0
+            if extra_cycle_type == BRANCHEC:
+                # special case where "branch" returns the number of extra cycles
+                extra_cycle_nb = func()
             else:
-                addr, val = self.get_addr_val(addr_mode)
-                func(addr, val)
-            self.dbg()
+                if addr_mode in (IMPLICIT, ACCUMULATOR):
+                    # functions with no arg
+                    func()
+                else:
+                    # functions that uses addressing
+                    addr, val, page_crossed = self.get_addr_val(addr_mode)
+                    func(addr, val)
+                    if page_crossed:
+                        extra_cycle_nb = 1
+            ncycle = base_ncycle + extra_cycle_nb
+            # self.dbg()
             self.prgm_ctr += nbytes
-            iter += 1
-            time.sleep(0.002)
 
     def dbg(self):
         print()
