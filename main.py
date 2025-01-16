@@ -14,6 +14,7 @@ REG_X = 1
 REG_Y = 2
 REG_S = 3 # status register
 
+IMPLICIT = -1
 IMMEDIATE = 0
 ZEROPAGE = 1
 ZEROPAGE_X = 2
@@ -34,6 +35,10 @@ STATUS_DEC   = 0b00001000
 STATUS_INTER = 0b00000100
 STATUS_ZERO  = 0b00000010
 STATUS_CARRY = 0b00000001
+
+NOEC = 0
+YESEC = 1
+BRANCHEC = 2
 
 def byte_not(val):
     return ~val%256
@@ -62,186 +67,208 @@ class Emulator(threading.Thread):
             for index, val in enumerate(f.read()):
                 self.mem[self.prgm_start + index] = val
 
-        # operation, nbytes
+        # operation, nbytes, ncycles, extracycles
         self.opcodes = {
-            0x00: [lambda : None, 2**18], # BRK : a big nbbyte will cause the pc to overflow and the program to stop
+            0x00: [lambda : None, IMPLICIT, 2**18, 7, NOEC], # BRK : a big nbbyte will cause the pc to overflow and the program to stop
 
-            0xea: [lambda : None, 1], # NOP
+            0xea: [lambda : None, IMPLICIT, 1, 2, NOEC], # NOP
+
 
             # BIT TEST
-            0x24: [lambda : self.bit(ZEROPAGE), 2],
-            0x2c: [lambda : self.bit(ABSOLUTE), 3],
+            0x24: [self.bit, ZEROPAGE, 2, 3, NOEC],
+            0x2c: [self.bit, ABSOLUTE, 3, 4, NOEC],
             
+
             ## ADD
-            0x69: [lambda : self.adc(IMMEDIATE), 2],
-            0x65: [lambda : self.adc(ZEROPAGE), 2], 
-            0x75: [lambda : self.adc(ZEROPAGE_X), 2],
-            0x6d: [lambda : self.adc(ABSOLUTE), 3],
-            0x7d: [lambda : self.adc(ABSOLUTE_X), 3],
-            0x79: [lambda : self.adc(ABSOLUTE_Y), 3],
-            0x61: [lambda : self.adc(PRE_INDEX_INDIRECT), 2],
-            0x71: [lambda : self.adc(POST_INDEX_INDIRECT), 2],
+            0x69: [self.adc, IMMEDIATE, 2, 2, NOEC],
+            0x65: [self.adc, ZEROPAGE, 2, 3, NOEC], 
+            0x75: [self.adc, ZEROPAGE_X, 2, 4, NOEC],
+            0x6d: [self.adc, ABSOLUTE, 3, 4, NOEC],
+            0x7d: [self.adc, ABSOLUTE_X, 3, 4, YESEC],
+            0x79: [self.adc, ABSOLUTE_Y, 3, 4, YESEC],
+            0x61: [self.adc, PRE_INDEX_INDIRECT, 2, 6, NOEC],
+            0x71: [self.adc, POST_INDEX_INDIRECT, 2, 5, YESEC],
+
 
             ## SUBSTRACT - SBC
-            0xe9: [lambda : self.sbc(IMMEDIATE), 2],
-            0xe5: [lambda : self.sbc(ZEROPAGE), 2],
-            0xf5: [lambda : self.sbc(ZEROPAGE_X), 2],
-            0xed: [lambda : self.sbc(ABSOLUTE), 3],
-            0xfd: [lambda : self.sbc(ABSOLUTE_X), 3],
-            0xf9: [lambda : self.sbc(ABSOLUTE_Y), 3],
-            0xe1: [lambda : self.sbc(PRE_INDEX_INDIRECT), 2],
-            0xf1: [lambda : self.sbc(POST_INDEX_INDIRECT), 2],
+            0xe9: [self.sbc, IMMEDIATE, 2, 2, NOEC],
+            0xe5: [self.sbc, ZEROPAGE, 2, 3, NOEC],
+            0xf5: [self.sbc, ZEROPAGE_X, 2, 4, NOEC],
+            0xed: [self.sbc, ABSOLUTE, 3, 4, NOEC],
+            0xfd: [self.sbc, ABSOLUTE_X, 3, 4, YESEC],
+            0xf9: [self.sbc, ABSOLUTE_Y, 3, 4, YESEC],
+            0xe1: [self.sbc, PRE_INDEX_INDIRECT, 2, 6, NOEC],
+            0xf1: [self.sbc, POST_INDEX_INDIRECT, 2, 5, YESEC],
+
 
             ## AND
-            0x29: [lambda : self.and_(IMMEDIATE), 2],
-            0x25: [lambda : self.and_(ZEROPAGE), 2], 
-            0x35: [lambda : self.and_(ZEROPAGE_X), 2],
-            0x2D: [lambda : self.and_(ABSOLUTE), 3],
-            0x3D: [lambda : self.and_(ABSOLUTE_X), 3],
-            0x39: [lambda : self.and_(ABSOLUTE_Y), 3],
-            0x21: [lambda : self.and_(PRE_INDEX_INDIRECT), 2],
-            0x31: [lambda : self.and_(POST_INDEX_INDIRECT), 2],
+            0x29: [self.and_, IMMEDIATE, 2, 2, NOEC],
+            0x25: [self.and_, ZEROPAGE, 2, 3, NOEC], 
+            0x35: [self.and_, ZEROPAGE_X, 2, 4, NOEC],
+            0x2D: [self.and_, ABSOLUTE, 3, 4, NOEC],
+            0x3D: [self.and_, ABSOLUTE_X, 3, 4, YESEC],
+            0x39: [self.and_, ABSOLUTE_Y, 3, 4, YESEC],
+            0x21: [self.and_, PRE_INDEX_INDIRECT, 2, 6, NOEC],
+            0x31: [self.and_, POST_INDEX_INDIRECT, 2, 5, YESEC],
 
-            ## OR
-            0x09: [lambda : self.or_(IMMEDIATE), 2],
-            0x05: [lambda : self.or_(ZEROPAGE), 2], 
-            0x15: [lambda : self.or_(ZEROPAGE_X), 2],
-            0x0d: [lambda : self.or_(ABSOLUTE), 3],
-            0x1d: [lambda : self.or_(ABSOLUTE_X), 3],
-            0x19: [lambda : self.or_(ABSOLUTE_Y), 3],
-            0x01: [lambda : self.or_(PRE_INDEX_INDIRECT), 2],
-            0x11: [lambda : self.or_(POST_INDEX_INDIRECT), 2],
+
+            ## ORA
+            0x09: [self.or_, IMMEDIATE, 2, 2, NOEC],
+            0x05: [self.or_, ZEROPAGE, 2, 3, NOEC], 
+            0x15: [self.or_, ZEROPAGE_X, 2, 4, NOEC],
+            0x0d: [self.or_, ABSOLUTE, 3, 4, NOEC],
+            0x1d: [self.or_, ABSOLUTE_X, 3, 4, YESEC],
+            0x19: [self.or_, ABSOLUTE_Y, 3, 4, YESEC],
+            0x01: [self.or_, PRE_INDEX_INDIRECT, 2, 6, NOEC],
+            0x11: [self.or_, POST_INDEX_INDIRECT, 2, 5, YESEC],
+
 
             ## CLEAR STATUS
-            0x18: [lambda : self.set_status_bit(STATUS_CARRY, False), 1], # CLC
-            0xd8: [lambda : self.set_status_bit(STATUS_DEC, False), 1], # CLD
-            0x58: [lambda : self.set_status_bit(STATUS_INTER, False), 1], # CLI
-            0xb8: [lambda : self.set_status_bit(STATUS_OVFLO, False), 1], # CLV
+            0x18: [lambda : self.set_status_bit(STATUS_CARRY, False), IMPLICIT, 1, 2, NOEC], # CLC
+            0xd8: [lambda : self.set_status_bit(STATUS_DEC, False), IMPLICIT, 1, 2, NOEC], # CLD
+            0x58: [lambda : self.set_status_bit(STATUS_INTER, False), IMPLICIT, 1, 2, NOEC], # CLI
+            0xb8: [lambda : self.set_status_bit(STATUS_OVFLO, False), IMPLICIT, 1, 2, NOEC], # CLV
+
 
             ## SET STATUS
-            0x38: [lambda : self.set_status_bit(STATUS_CARRY, True), 1], # SEC
-            0xf8: [lambda : self.set_status_bit(STATUS_DEC, True), 1], # SED
-            0x78: [lambda : self.set_status_bit(STATUS_INTER, True), 1], # SEI
+            0x38: [lambda : self.set_status_bit(STATUS_CARRY, True), IMPLICIT, 1, 2, NOEC], # SEC
+            0xf8: [lambda : self.set_status_bit(STATUS_DEC, True), IMPLICIT, 1, 2, NOEC], # SED
+            0x78: [lambda : self.set_status_bit(STATUS_INTER, True), IMPLICIT, 1, 2, NOEC], # SEI
+
 
             ## BIT SHIFT
-            0x4a: [lambda : self.shift_right(ACCUMULATOR), 1], # LSR
-            0x46: [lambda : self.shift_right(ZEROPAGE), 2],
-            0x56: [lambda : self.shift_right(ZEROPAGE_X), 2],
-            0x4e: [lambda : self.shift_right(ABSOLUTE), 3],
-            0x5e: [lambda : self.shift_right(ABSOLUTE_X), 3],
+            # LSR
+            0x4a: [self.shift_right_accumulator, ACCUMULATOR, 1, 2, NOEC],
+            0x46: [self.shift_right_memory, ZEROPAGE, 2, 5, NOEC],
+            0x56: [self.shift_right_memory, ZEROPAGE_X, 2, 6, NOEC],
+            0x4e: [self.shift_right_memory, ABSOLUTE, 3, 6, NOEC],
+            0x5e: [self.shift_right_memory, ABSOLUTE_X, 3, 7, NOEC],
+
 
             ## LOADS
-            0xa9: [lambda : self.ld(REG_A, IMMEDIATE), 2],
-            0xa5: [lambda : self.ld(REG_A, ZEROPAGE), 2],
-            0xb5: [lambda : self.ld(REG_A, ZEROPAGE_X), 2],
-            0xad: [lambda : self.ld(REG_A, ABSOLUTE), 3],
-            0xbd: [lambda : self.ld(REG_A, ABSOLUTE_X), 3],
-            0xb9: [lambda : self.ld(REG_A, ABSOLUTE_Y), 3],
-            0xa1: [lambda : self.ld(REG_A, PRE_INDEX_INDIRECT), 2],
-            0xb1: [lambda : self.ld(REG_A, POST_INDEX_INDIRECT), 2],
+            # LDA
+            0xa9: [self.lda, IMMEDIATE, 2, 2, NOEC], #
+            0xa5: [self.lda, ZEROPAGE, 2, 3, NOEC],
+            0xb5: [self.lda, ZEROPAGE_X, 2, 4, NOEC],
+            0xad: [self.lda, ABSOLUTE, 3, 4, NOEC],
+            0xbd: [self.lda, ABSOLUTE_X, 3, 4, YESEC],
+            0xb9: [self.lda, ABSOLUTE_Y, 3, 4, YESEC],
+            0xa1: [self.lda, PRE_INDEX_INDIRECT, 2, 6, NOEC],
+            0xb1: [self.lda, POST_INDEX_INDIRECT, 2, 5, YESEC],
 
-            0xa2: [lambda : self.ld(REG_X, IMMEDIATE), 2],
-            0xa6: [lambda : self.ld(REG_X, ZEROPAGE), 2],
-            0xb6: [lambda : self.ld(REG_X, ZEROPAGE_Y), 2],
-            0xae: [lambda : self.ld(REG_X, ABSOLUTE), 3],
-            0xbe: [lambda : self.ld(REG_X, ABSOLUTE_Y), 3],
+            # LDX
+            0xa2: [self.ldx, IMMEDIATE, 2, 2, NOEC], # LDX
+            0xa6: [self.ldx, ZEROPAGE, 2, 3, NOEC],
+            0xb6: [self.ldx, ZEROPAGE_Y, 2, 4, NOEC],
+            0xae: [self.ldx, ABSOLUTE, 3, 4, NOEC],
+            0xbe: [self.ldx, ABSOLUTE_Y, 3, 4, YESEC],
 
-            0xa0: [lambda : self.ld(REG_Y, IMMEDIATE), 2],
-            0xa4: [lambda : self.ld(REG_Y, ZEROPAGE), 2],
-            0xb4: [lambda : self.ld(REG_Y, ZEROPAGE_X), 2],
-            0xac: [lambda : self.ld(REG_Y, ABSOLUTE), 3],
-            0xbc: [lambda : self.ld(REG_Y, ABSOLUTE_X), 3],
+            # LDY
+            0xa0: [self.ldy, IMMEDIATE, 2, 2, NOEC],
+            0xa4: [self.ldy, ZEROPAGE, 2, 3, NOEC],
+            0xb4: [self.ldy, ZEROPAGE_X, 2, 4, NOEC],
+            0xac: [self.ldy, ABSOLUTE, 3, 4, NOEC],
+            0xbc: [self.ldy, ABSOLUTE_X, 3, 4, YESEC],
 
 
             ## STORE
-            0x85: [lambda : self.st(REG_A, ZEROPAGE), 2],
-            0x95: [lambda : self.st(REG_A, ZEROPAGE_X), 2],
-            0x8d: [lambda : self.st(REG_A, ABSOLUTE), 3],
-            0x9d: [lambda : self.st(REG_A, ABSOLUTE_X), 3],
-            0x99: [lambda : self.st(REG_A, ABSOLUTE_Y), 3],
-            0x81: [lambda : self.st(REG_A, PRE_INDEX_INDIRECT), 2],
-            0x91: [lambda : self.st(REG_A, POST_INDEX_INDIRECT), 2],
+            0x85: [self.sta, ZEROPAGE, 2, 3, NOEC],
+            0x95: [self.sta, ZEROPAGE_X, 2, 4, NOEC],
+            0x8d: [self.sta, ABSOLUTE, 3, 4, NOEC],
+            0x9d: [self.sta, ABSOLUTE_X, 3, 5, NOEC],
+            0x99: [self.sta, ABSOLUTE_Y, 3, 5, NOEC],
+            0x81: [self.sta, PRE_INDEX_INDIRECT, 2, 6, NOEC],
+            0x91: [self.sta, POST_INDEX_INDIRECT, 2, 6, NOEC],
 
-            0x86: [lambda : self.st(REG_X, ZEROPAGE), 2],
-            0x96: [lambda : self.st(REG_X, ZEROPAGE_Y), 2],
-            0x8e: [lambda : self.st(REG_X, ABSOLUTE), 3],
+            0x86: [self.stx, ZEROPAGE, 2, 3, NOEC],
+            0x96: [self.stx, ZEROPAGE_Y, 2, 4, NOEC],
+            0x8e: [self.stx, ABSOLUTE, 3, 4, NOEC],
 
-            0x84: [lambda : self.st(REG_Y, ZEROPAGE), 2],
-            0x94: [lambda : self.st(REG_Y, ZEROPAGE_X), 2],
-            0x8c: [lambda : self.st(REG_Y, ABSOLUTE), 3],
+            0x84: [self.sty, ZEROPAGE, 2, 3, NOEC],
+            0x94: [self.sty, ZEROPAGE_X, 2, 4, NOEC],
+            0x8c: [self.sty, ABSOLUTE, 3, 4, NOEC],
 
 
             ## TRANSFER
-            0xaa: [lambda : self.tr(REG_A, REG_X), 1], # TAX
-            0xa8: [lambda : self.tr(REG_A, REG_Y), 1], # TAY
-            0xba: [lambda : self.tr(REG_S, REG_X), 1], # TSX
-            0x8a: [lambda : self.tr(REG_X, REG_A), 1], # TXA
-            0x9a: [lambda : self.tr(REG_X, REG_S), 1], # TXS
-            0x98: [lambda : self.tr(REG_Y, REG_A), 1], # TYA
+            0xaa: [lambda : self.tr(REG_A, REG_X), IMPLICIT, 1, 2, NOEC], # TAX
+            0xa8: [lambda : self.tr(REG_A, REG_Y), IMPLICIT, 1, 2, NOEC], # TAY
+            0xba: [lambda : self.tr(REG_S, REG_X), IMPLICIT, 1, 2, NOEC], # TSX
+            0x8a: [lambda : self.tr(REG_X, REG_A), IMPLICIT, 1, 2, NOEC], # TXA
+            0x9a: [lambda : self.tr(REG_X, REG_S), IMPLICIT, 1, 2, NOEC], # TXS
+            0x98: [lambda : self.tr(REG_Y, REG_A), IMPLICIT, 1, 2, NOEC], # TYA
 
 
             ## COMPARE
-            0xc9: [lambda : self.cp(REG_A, IMMEDIATE), 2],
-            0xc5: [lambda : self.cp(REG_A, ZEROPAGE), 2],
-            0xd5: [lambda : self.cp(REG_A, ZEROPAGE_X), 2],
-            0xcd: [lambda : self.cp(REG_A, ABSOLUTE), 3],
-            0xdd: [lambda : self.cp(REG_A, ABSOLUTE_X), 3],
-            0xd9: [lambda : self.cp(REG_A, ABSOLUTE_Y), 3],
-            0xc1: [lambda : self.cp(REG_A, PRE_INDEX_INDIRECT), 2],
-            0xd1: [lambda : self.cp(REG_A, POST_INDEX_INDIRECT), 2],
+            0xc9: [self.cpa, IMMEDIATE, 2, 2, NOEC],
+            0xc5: [self.cpa, ZEROPAGE, 2, 3, NOEC],
+            0xd5: [self.cpa, ZEROPAGE_X, 2, 4, NOEC],
+            0xcd: [self.cpa, ABSOLUTE, 3, 4, NOEC],
+            0xdd: [self.cpa, ABSOLUTE_X, 3, 4, YESEC],
+            0xd9: [self.cpa, ABSOLUTE_Y, 3, 4, YESEC],
+            0xc1: [self.cpa, PRE_INDEX_INDIRECT, 2, 6, NOEC],
+            0xd1: [self.cpa, POST_INDEX_INDIRECT, 2, 5, YESEC],
 
-            0xe0: [lambda : self.cp(REG_X, IMMEDIATE), 2],
-            0xe4: [lambda : self.cp(REG_X, ZEROPAGE), 2],
-            0xec: [lambda : self.cp(REG_X, ABSOLUTE), 3],
+            0xe0: [self.cpx, IMMEDIATE, 2, 2, NOEC],
+            0xe4: [self.cpx, ZEROPAGE, 2, 3, NOEC],
+            0xec: [self.cpx, ABSOLUTE, 3, 4, NOEC],
 
-            0xc0: [lambda : self.cp(REG_Y, IMMEDIATE), 2],
-            0xc4: [lambda : self.cp(REG_Y, ZEROPAGE), 2],
-            0xcc: [lambda : self.cp(REG_Y, ABSOLUTE), 3],
+            0xc0: [self.cpy, IMMEDIATE, 2, 2, NOEC],
+            0xc4: [self.cpy, ZEROPAGE, 2, 3, NOEC],
+            0xcc: [self.cpy, ABSOLUTE, 3, 4, NOEC],
 
 
             ## STACK PUSH/PULL
-            0x48: [lambda : self.ph(REG_A), 1], # PHA
-            0x68: [lambda : self.pl(REG_A), 1], # PLA
-            0x08: [lambda : self.ph(REG_S), 1], # PHP
-            0x28: [lambda : self.pl(REG_S), 1], # PLP
+            0x48: [lambda : self.ph(REG_A), IMPLICIT, 1, 3, NOEC], # PHA
+            0x68: [lambda : self.pl(REG_A), IMPLICIT, 1, 4, NOEC], # PLA
+            0x08: [lambda : self.ph(REG_S), IMPLICIT, 1, 3, NOEC], # PHP
+            0x28: [lambda : self.pl(REG_S), IMPLICIT, 1, 4, NOEC], # PLP
 
 
             ## INCREASE / DECREASE
-            0xca: [lambda : self.in_de_reg(REG_X, sign_plus=False), 1], #DEX
-            0x88: [lambda : self.in_de_reg(REG_Y, sign_plus=False), 1], #DEY
+            0xca: [self.dex, IMPLICIT, 1, 2, NOEC], #DEX
+            0x88: [self.dey, IMPLICIT, 1, 2, NOEC], #DEY
 
-            0xe8: [lambda : self.in_de_reg(REG_X, sign_plus=True), 1], # INX
-            0xc8: [lambda : self.in_de_reg(REG_Y, sign_plus=True), 1], # INY
+            0xe8: [self.inx, IMPLICIT, 1, 2, NOEC], # INX
+            0xc8: [self.iny, IMPLICIT, 1, 2, NOEC], # INY
 
-            0xc6: [lambda : self.in_de_mem(ZEROPAGE, sign_plus=False), 2], # DEC
-            0xd6: [lambda : self.in_de_mem(ZEROPAGE_X, sign_plus=False), 2], # DEC
-            0xce: [lambda : self.in_de_mem(ABSOLUTE, sign_plus=False), 3], # DEC
-            0xde: [lambda : self.in_de_mem(ABSOLUTE_X, sign_plus=False), 3], # DEC
+            0xc6: [self.dec, ZEROPAGE, 2, 5, NOEC], # DEC
+            0xd6: [self.dec, ZEROPAGE_X, 2, 6, NOEC], # DEC
+            0xce: [self.dec, ABSOLUTE, 3, 6, NOEC], # DEC
+            0xde: [self.dec, ABSOLUTE_X, 3, 7, NOEC], # DEC
 
-            0xe6: [lambda : self.in_de_mem(ZEROPAGE, sign_plus=True), 2], # INC
-            0xf6: [lambda : self.in_de_mem(ZEROPAGE_X, sign_plus=True), 2], # INC
-            0xee: [lambda : self.in_de_mem(ABSOLUTE, sign_plus=True), 3], # INC
-            0xfe: [lambda : self.in_de_mem(ABSOLUTE_X, sign_plus=True), 3], # INC
+            0xe6: [self.inc, ZEROPAGE, 2, 5, NOEC], # INC
+            0xf6: [self.inc, ZEROPAGE_X, 2, 6, NOEC], # INC
+            0xee: [self.inc, ABSOLUTE, 3, 6, NOEC], # INC
+            0xfe: [self.inc, ABSOLUTE_X, 3, 7, NOEC], # INC
 
 
             ## BRANCH
-            0xd0: [lambda : self.branch(STATUS_ZERO, True), 2], # BNE
-            0xf0: [lambda : self.branch(STATUS_ZERO, False), 2], # BEQ (inv of BNE)
-            0x90: [lambda : self.branch(STATUS_CARRY, True), 2], # BCC Branch Carry Clear
-            0xb0: [lambda : self.branch(STATUS_CARRY, False), 2], # BCS Branch Carry Set
-            0x30: [lambda : self.branch(STATUS_NEG, False), 2], # BMI Branch on result is negative (mi = minus)
-            0x10: [lambda : self.branch(STATUS_NEG, True), 2], # BPL Branch on result is positive (pl = plsu)
-            0x50: [lambda : self.branch(STATUS_OVFLO, True), 2], # BVC Branch on overflow clear
-            0x70: [lambda : self.branch(STATUS_OVFLO, False), 2], # BVS Branch on overflow set
+            0xd0: [lambda : self.branch(STATUS_ZERO, True), IMPLICIT, 2, 2, BRANCHEC], # BNE
+            0xf0: [lambda : self.branch(STATUS_ZERO, False), IMPLICIT, 2, 2, BRANCHEC], # BEQ (inv of BNE)
+            0x90: [lambda : self.branch(STATUS_CARRY, True), IMPLICIT, 2, 2, BRANCHEC], # BCC Branch Carry Clear
+            0xb0: [lambda : self.branch(STATUS_CARRY, False), IMPLICIT, 2, 2, BRANCHEC], # BCS Branch Carry Set
+            0x30: [lambda : self.branch(STATUS_NEG, False), IMPLICIT, 2, 2, BRANCHEC], # BMI Branch on result is negative (mi = minus)
+            0x10: [lambda : self.branch(STATUS_NEG, True), IMPLICIT, 2, 2, BRANCHEC], # BPL Branch on result is positive (pl = plsu)
+            0x50: [lambda : self.branch(STATUS_OVFLO, True), IMPLICIT, 2, 2, BRANCHEC], # BVC Branch on overflow clear
+            0x70: [lambda : self.branch(STATUS_OVFLO, False), IMPLICIT, 2, 2, BRANCHEC], # BVS Branch on overflow set
 
 
             ## JUMP
             # 0 byte shift because we handle the shift in the function call
-            0x4c: [lambda : self.jmp(ABSOLUTE), 0], # JMP
-            0x6c: [lambda : self.jmp(INDIRECT), 0], # JMP
-            0x20: [self.jsr, 0], # JSR
-            0x60: [self.rts, 0], # RTS
+            0x4c: [self.jmp, ABSOLUTE, 0, 3, NOEC], # JMP
+            0x6c: [self.jmp, INDIRECT, 0, 5, NOEC], # JMP
+            0x20: [self.jsr, ABSOLUTE, 0, 6, NOEC], # JSR
+            0x60: [self.rts, IMPLICIT, 0, 6, NOEC], # RTS
         }
+
+        self.check_opcode_map()
+
+    def check_opcode_map(self):
+        seen_opcodes = []
+        for key, val in self.opcodes.items():
+            assert key not in seen_opcodes
+            assert len(val) == 5
+            seen_opcodes.append(key)
 
     def set_status_bit(self, status_bit, on):
         if on:
@@ -319,23 +346,22 @@ class Emulator(threading.Thread):
     def clear(self, status_bit):
         self.set_status_bit(status_bit, False)
     
-    def jmp(self, addr_mode):
-        addr, _ = self.get_addr_val(addr_mode)
+    def jmp(self, addr, val):
         self.prgm_ctr = addr
             
     def stack_push(self, val):
-        addr = self.stack_ptr + 0x0100
-        self.mem[addr] = val
+        stack_addr = self.stack_ptr + 0x0100
+        self.mem[stack_addr] = val
         self.stack_ptr -= 1
 
     def stack_pull(self):
         self.stack_ptr += 1
-        addr = self.stack_ptr + 0x0100
-        return self.mem[addr]
+        stack_addr = self.stack_ptr + 0x0100
+        return self.mem[stack_addr]
 
-    def jsr(self):
+    def jsr(self, addr, val):
         self.stack_push(self.prgm_ctr + 2)
-        self.jmp(ABSOLUTE)
+        self.jmp(addr, val)
 
     def rts(self):
         addr = self.stack_pull()
@@ -357,38 +383,58 @@ class Emulator(threading.Thread):
             # for REG_S it is already handled!
             self.update_zn_flag(val)
 
-    def bit(self, addr_mode):
+    def bit(self, addr, val):
         # https://www.masswerk.at/6502/6502_instruction_set.html#bitcompare
         acc = self.regs[REG_A]
-        _, ope = self.get_addr_val(addr_mode)
-        self.set_status_bit(STATUS_ZERO, acc & ope == 0)
-        self.set_status_bit(STATUS_NEG, ope & 0b10000000 != 0)
-        self.set_status_bit(STATUS_OVFLO, ope & 0b01000000 != 0)
+        self.set_status_bit(STATUS_ZERO, acc & val == 0)
+        self.set_status_bit(STATUS_NEG, val & 0b10000000 != 0)
+        self.set_status_bit(STATUS_OVFLO, val & 0b01000000 != 0)
 
-    def ld(self, reg, addr_mode):
+    def ld(self, reg, val):
         # load accumulator
-        _, val = self.get_addr_val(addr_mode)
         self.regs[reg] = val
         self.update_zn_flag(val)
 
-    def st(self, reg, addr_mode):   
-        if addr_mode == IMMEDIATE:
-            raise Exception
+    def lda(self, addr, val):
+        return self.ld(REG_A, val)
 
-        addr, _ = self.get_addr_val(addr_mode)
+    def ldx(self, addr, val):
+        return self.ld(REG_X, val)
+    
+    def ldy(self, addr, val):
+        return self.ld(REG_Y, val)
+    
+    def st(self, reg, addr):
         val = self.regs[reg]
         self.mem[addr] = val
         self.update_zn_flag(val)
-        
+
+    def sta(self, addr, val):
+        return self.st(REG_A, addr)   
+    
+    def stx(self, addr, val):
+        return self.st(REG_X, addr)
+    
+    def sty(self, addr, val):
+        return self.st(REG_Y, addr)
+    
     def tr(self, sreg, dreg):
         val = self.regs[sreg]
         self.regs[dreg] = val
         self.update_zn_flag(val)
         
-    def cp(self, reg, addr_mode):
-        _, val = self.get_addr_val(addr_mode)
+    def cp(self, reg, val):
         diff = self.regs[reg] - val
         self.update_zn_flag(diff) #status_zero goes to 0 if equality
+
+    def cpa(self, addr, val):
+        return self.cp(REG_A, val)
+    
+    def cpx(self, addr, val):
+        return self.cp(REG_X, val)
+    
+    def cpy(self, addr, val):
+        return self.cp(REG_Y, val)
 
     def in_de_reg(self, reg, sign_plus):
         # increase or decrease handler
@@ -399,14 +445,31 @@ class Emulator(threading.Thread):
         self.regs[reg] %= 256
         self.update_zn_flag(self.regs[reg])
 
-    def in_de_mem(self, addr_mode, sign_plus):
-        addr, _ = self.get_addr_val(addr_mode)
+    def inx(self):
+        return self.in_de_reg(REG_X, True)
+
+    def dex(self):
+        return self.in_de_reg(REG_X, False)
+    
+    def iny(self):
+        return self.in_de_reg(REG_Y, True)
+    
+    def dey(self):
+        return self.in_de_reg(REG_Y, False)
+    
+    def in_de_mem(self, addr, sign_plus):
         if sign_plus:
             self.mem[addr] += 1
         else:
             self.mem[addr] -= 1
         self.mem[addr] %= 256
         self.update_zn_flag(self.mem[addr])
+
+    def inc(self, addr, val):
+        return self.in_de_mem(addr, True)
+    
+    def dec(self, addr, val):
+        return self.in_de_mem(addr, False)
 
     def add_val_to_acc_carry(self, val):
         if self.regs[REG_S] & STATUS_CARRY != 0:
@@ -417,22 +480,18 @@ class Emulator(threading.Thread):
         self.regs[REG_A] %= 256
         self.update_zn_flag(self.regs[REG_A])
 
-    def adc(self, addr_mode):
-        _, val = self.get_addr_val(addr_mode)
+    def adc(self, addr, val):
         self.add_val_to_acc_carry(val)
 
-    def sbc(self, addr_mode):
+    def sbc(self, addr, val):
         # use two's complement https://stackoverflow.com/a/41253661
-        _, val = self.get_addr_val(addr_mode)
         self.add_val_to_acc_carry(byte_not(val))
 
-    def and_(self, addr_mode):
-        _, val = self.get_addr_val(addr_mode)
+    def and_(self, addr, val):
         self.regs[REG_A] &= val
         self.update_zn_flag(self.regs[REG_A])
 
-    def or_(self, addr_mode):
-        _, val = self.get_addr_val(addr_mode)
+    def or_(self, addr, val):
         self.regs[REG_A] |= val
         self.update_zn_flag(self.regs[REG_A])
 
@@ -450,18 +509,18 @@ class Emulator(threading.Thread):
                 branch_addr -= 256
             self.prgm_ctr += branch_addr
 
-    def shift_right(self, addr_mode):
+    def shift_right_memory(self, addr, val):
         # carry if lsb set
-        carry_on = False
-        if addr_mode == ACCUMULATOR:
-            carry_on = (self.regs[REG_A] & 0b00000001 != 0)
-            self.regs[REG_A] >>= 1
-            self.update_zn_flag(self.regs[REG_A])
-        else:
-            addr, _ = self.get_addr_val(addr_mode)
-            carry_on = (self.mem[addr] & 0b00000001 != 0)
-            self.mem[addr] >>= 1
-            self.update_zn_flag(self.mem[addr])
+        carry_on = (self.mem[addr] & 0b00000001 != 0)
+        self.mem[addr] >>= 1
+        self.update_zn_flag(self.mem[addr])
+        self.set_status_bit(STATUS_CARRY, carry_on)
+
+    def shift_right_accumulator(self):
+        # carry if lsb set
+        carry_on = (self.regs[REG_A] & 0b00000001 != 0)
+        self.regs[REG_A] >>= 1
+        self.update_zn_flag(self.regs[REG_A])
         self.set_status_bit(STATUS_CARRY, carry_on)
 
     def run(self):
@@ -475,8 +534,12 @@ class Emulator(threading.Thread):
                 break
             if not opcode in self.opcodes:
                 raise Exception(f"Unknown opcode {hex(opcode)}")
-            func, nbytes = self.opcodes[opcode]
-            func()
+            func, addr_mode, nbytes, base_ncycle, extra_cycle_type = self.opcodes[opcode]
+            if addr_mode in (IMPLICIT, ACCUMULATOR):
+                func()
+            else:
+                addr, val = self.get_addr_val(addr_mode)
+                func(addr, val)
             self.dbg()
             self.prgm_ctr += nbytes
             iter += 1
