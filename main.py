@@ -62,6 +62,9 @@ class Emulator(threading.Thread):
 
         self.mem = [0]*(2**16)
 
+        self.instuction_cycle = 0
+        self.instruction_nbcycles = 0
+
         # load program to memory
         with open(self.prgm_file, "rb") as f:
             for index, val in enumerate(f.read()):
@@ -544,35 +547,6 @@ class Emulator(threading.Thread):
         self.update_zn_flag(self.regs[REG_A])
         self.set_status_bit(STATUS_CARRY, carry_on)
 
-    def run(self):
-        while True:
-            e.mem[0xfe] = int(random.random()*256) # RANDOM GEN
-
-            opcode = self.mem[self.prgm_ctr]
-            if opcode == 0x00:
-                # TODO : handle BRK in a better way (raise interrupt flag)
-                break
-            if not opcode in self.opcodes:
-                raise Exception(f"Unknown opcode {hex(opcode)}")
-            func, addr_mode, nbytes, base_ncycle, extra_cycle_type = self.opcodes[opcode]
-            extra_cycle_nb = 0
-            if extra_cycle_type == BRANCHEC:
-                # special case where "branch" returns the number of extra cycles
-                extra_cycle_nb = func()
-            else:
-                if addr_mode in (IMPLICIT, ACCUMULATOR):
-                    # functions with no arg
-                    func()
-                else:
-                    # functions that uses addressing
-                    addr, val, page_crossed = self.get_addr_val(addr_mode)
-                    func(addr, val)
-                    if page_crossed:
-                        extra_cycle_nb = 1
-            ncycle = base_ncycle + extra_cycle_nb
-            # self.dbg()
-            self.prgm_ctr += nbytes
-
     def dbg(self):
         print()
         inst = self.lst.get_inst(self.prgm_ctr)
@@ -597,6 +571,52 @@ class Emulator(threading.Thread):
     def get_display_mat(self):
         mat = np.array(self.mem[0x0200:0x0600]).reshape((32,32))
         return mat
+
+    def exec_inst(self):
+        e.mem[0xfe] = int(random.random()*256) # RANDOM GEN
+
+        opcode = self.mem[self.prgm_ctr]
+        if opcode == 0x00:
+            # TODO : handle BRK in a better way (raise interrupt flag)
+            return -1
+        if not opcode in self.opcodes:
+            raise Exception(f"Unknown opcode {hex(opcode)}")
+        func, addr_mode, nbytes, base_ncycle, extra_cycle_type = self.opcodes[opcode]
+        extra_cycle_nb = 0
+        if extra_cycle_type == BRANCHEC:
+            # special case where "branch" returns the number of extra cycles
+            extra_cycle_nb = func()
+        else:
+            if addr_mode in (IMPLICIT, ACCUMULATOR):
+                # functions with no arg
+                func()
+            else:
+                # functions that uses addressing
+                addr, val, page_crossed = self.get_addr_val(addr_mode)
+                func(addr, val)
+                if page_crossed:
+                    extra_cycle_nb = 1
+        ncycle = base_ncycle + extra_cycle_nb
+        # self.dbg()
+        self.prgm_ctr += nbytes
+        time.sleep(0.000001)
+        return ncycle
+
+    def tick(self):
+        # run instruction if we are at the beggining of the cycle
+        # else just register the tick
+        if self.instuction_cycle == 0:
+            self.instruction_nbcycles = self.exec_inst()
+            if self.instruction_nbcycles == -1:
+                return False
+        self.instuction_cycle += 1
+        if self.instuction_cycle == self.instruction_nbcycles:
+            self.instuction_cycle = 0
+        return True
+
+    def run(self):
+        while self.tick():
+            pass
 
 
 def lst_addr_to_val(str_addr):
