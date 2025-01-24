@@ -1,13 +1,6 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.animation as animation
-import binascii
 import threading
 import random
 import time
-
-plt.rcParams['keymap.save'].remove('s')
-plt.rcParams['keymap.quit'].remove('q')
 
 REG_A = 0
 REG_X = 1
@@ -49,7 +42,7 @@ def dec2hex(val):
         val = "0" + val
     return val
 
-class Emulator(threading.Thread):
+class Emu6502(threading.Thread):
     def __init__(self, lst):
         super().__init__()
         self.lst = lst
@@ -64,11 +57,6 @@ class Emulator(threading.Thread):
 
         self.instuction_cycle = 0
         self.instruction_nbcycles = 0
-
-        # load program to memory
-        with open(self.prgm_file, "rb") as f:
-            for index, val in enumerate(f.read()):
-                self.mem[self.prgm_start + index] = val
 
         # operation, nbytes, ncycles, extracycles
         self.opcodes = {
@@ -562,18 +550,8 @@ class Emulator(threading.Thread):
         if "bkpt" in inst:
             input()
 
-    def display_mem(self):
-        # 32 x 32 from 0x0200 to 0x05ff
-        mat = np.array(self.mem[0x0200:0x0600]).reshape((32,32))
-        plt.imshow(mat)
-        plt.show()
-
-    def get_display_mat(self):
-        mat = np.array(self.mem[0x0200:0x0600]).reshape((32,32))
-        return mat
-
     def exec_inst(self):
-        e.mem[0xfe] = int(random.random()*256) # RANDOM GEN
+        self.mem[0xfe] = int(random.random()*256) # RANDOM GEN
 
         opcode = self.mem[self.prgm_ctr]
         if opcode == 0x00:
@@ -617,96 +595,3 @@ class Emulator(threading.Thread):
     def run(self):
         while self.tick():
             pass
-
-
-def lst_addr_to_val(str_addr):
-    data = binascii.unhexlify(str_addr)
-    val = 0
-    for b in data:
-        val = val*256 + b
-    return val
-
-class LstManager:
-    def __init__(self):
-        self.inst_map = {}
-        with open("test.lst", "r") as f:
-            
-            for l in f.readlines():
-                if l[0] != '0':
-                    continue
-                addr = lst_addr_to_val(l[0:6])
-                inst = l[11:].rstrip("\n").rstrip().lstrip()
-                if len(inst) == 0:
-                    continue
-                self.inst_map[addr] = inst
-
-    def get_inst(self, addr):
-        prgm_addr = addr - 0x0800
-        if prgm_addr not in self.inst_map:
-            return "NOP"
-        return self.inst_map[prgm_addr]
-    
-class AnimatedImshow:
-    def __init__(self, data_provider, interval=50):
-        """
-        Initialize the AnimatedImshow class.
-
-        Parameters:
-        - data_provider: An instance of DataProvider.
-        - interval: The delay between frames in milliseconds.
-        - cmap: The colormap to use for the imshow.
-        """
-        self.data_provider = data_provider
-        self.interval = interval
-        self.fig, self.ax = plt.subplots()
-        self.im = self.ax.imshow(np.random.rand(32,32)) # if i don't use a random init vector it don't work???
-
-    def update(self, frame):
-        """
-        Update the image for the given frame.
-
-        Parameters:
-        - frame: The current frame index.
-        """
-        mat = self.data_provider.get_display_mat()
-        self.im.set_array(mat)
-        return [self.im]
-
-    def animate(self):
-        """
-        Create and display the animation.
-        """
-        self.ani = animation.FuncAnimation(
-            self.fig, self.update, interval=self.interval, blit=True)
-        plt.show()
-
-
-l = LstManager()
-
-e = Emulator(l)
-m = AnimatedImshow(e)
-
-import evdev
-dev = evdev.InputDevice('/dev/input/event4')
-
-print(dev)
-
-def readkb():
-    for event in dev.read_loop():
-        if event.type == evdev.ecodes.EV_KEY:
-
-            key = evdev.ecodes.KEY[event.code][4:]
-            if len(key) != 1:
-                continue
-            if event.value != 1: #press down
-                continue
-            asciival = ord(key.lower())
-            e.mem[0xff] = asciival
-
-kbthread = threading.Thread(target=readkb)
-kbthread.start()
-
-
-e.start()
-m.animate()
-kbthread.join()

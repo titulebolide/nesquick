@@ -3,3 +3,4 @@
 *.cfg
 *.asm
 *.lst
+__pycache__/
