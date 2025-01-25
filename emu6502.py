@@ -23,6 +23,7 @@ ACCUMULATOR = 11
 # status register
 STATUS_NEG   = 0b10000000
 STATUS_OVFLO = 0b01000000
+STATUS_BIT5  = 0b00100000
 STATUS_BREAK = 0b00010000
 STATUS_DEC   = 0b00001000
 STATUS_INTER = 0b00000100
@@ -33,6 +34,13 @@ NOEC = 0
 YESEC = 1
 BRANCHEC = 2
 
+INTERRUPT_NO = 0
+INTERRUPT_IRQ = 0
+INTERRUPT_NMI = 0
+
+OPCODE_IRQ = 0xffe
+OPCODE_NMI = 0xfff
+
 def byte_not(val):
     return ~val%256
 
@@ -42,6 +50,11 @@ def dec2hex(val):
         val = "0" + val
     return val
 
+def low_byte(val):
+    return val % 256
+
+def high_byte(val):
+    return val // 256
 class Emu6502(threading.Thread):
     def __init__(self, lst):
         super().__init__()
@@ -58,9 +71,19 @@ class Emu6502(threading.Thread):
         self.instuction_cycle = 0
         self.instruction_nbcycles = 0
 
+        # if no HW interrupt (understand : no external interrupt)
+        # set to INTERRUPT_NO
+        # else, it will save the interrupt type
+        self.interrupt_type = INTERRUPT_NO 
+
         # operation, nbytes, ncycles, extracycles
         self.opcodes = {
-            0x00: [lambda : None, IMPLICIT, 2**18, 7, NOEC], # BRK : a big nbbyte will cause the pc to overflow and the program to stop
+            ## INTERRUPTS
+            # fake opcode to handle hw interrupts
+            OPCODE_IRQ : [self.nmi, IMPLICIT, 0, 7, NOEC],
+            OPCODE_NMI : [self.irq, IMPLICIT, 0, 7, NOEC],
+            0x00: [self.break_, IMPLICIT, 0, 7, NOEC], # BRK : Like a jump, nbytes=0
+            0x40: [self.return_from_interrupt, IMPLICIT, 0, 6, NOEC],
 
             0xea: [lambda : None, IMPLICIT, 1, 2, NOEC], # NOP
 
@@ -270,19 +293,24 @@ class Emu6502(threading.Thread):
         else:
             self.regs[REG_S] &= byte_not(status_bit)
 
+    def get_status_bit(self, status_bit):
+        if self.regs[REG_S] & status_bit != 0:
+            return 1
+        return 0
+
     def get_addr_val(self, mode):
         page_crossed = False
         
         if mode in (ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y):
             addr = self.mem[self.prgm_ctr+1] + self.mem[self.prgm_ctr+2] * 256
-            base_page_no = addr >> 8 # high byte is page no
+            base_page_no = high_byte(addr) # high byte is page no
             if mode == ABSOLUTE_X:
                 addr += self.regs[REG_X]
                 addr %= 65536
             elif mode == ABSOLUTE_Y:
                 addr += self.regs[REG_Y]
                 addr %= 65536
-            new_page_no = addr >> 8
+            new_page_no = high_byte(addr)
             # page is crossed if page number has changed
             page_crossed = (new_page_no != base_page_no)
 
@@ -303,7 +331,7 @@ class Emu6502(threading.Thread):
             implicit_addr, _, _ = self.get_addr_val(ABSOLUTE)
             dest_addr_lsb = self.mem[implicit_addr]
             dest_addr_msb = self.mem[(implicit_addr + 1)%65536]
-            addr = dest_addr_lsb + dest_addr_msb * 256
+            addr = dest_addr_lsb + dest_addr_msb << 8
 
         elif mode == PRE_INDEX_INDIRECT:
             # or indexed indirect
@@ -311,7 +339,7 @@ class Emu6502(threading.Thread):
             implicit_addr, _, _ = self.get_addr_val(ZEROPAGE_X)
             dest_addr_lsb = self.mem[implicit_addr]
             dest_addr_msb = self.mem[(implicit_addr + 1)%65536]
-            addr = dest_addr_lsb + dest_addr_msb * 256
+            addr = dest_addr_lsb + dest_addr_msb << 8
 
         elif mode == POST_INDEX_INDIRECT:
             # or indirect indexed
@@ -320,11 +348,11 @@ class Emu6502(threading.Thread):
             implicit_addr, _, _ = self.get_addr_val(ZEROPAGE)
             dest_addr_lsb = self.mem[implicit_addr]
             dest_addr_msb = self.mem[(implicit_addr + 1)%65536]
-            addr = dest_addr_lsb + dest_addr_msb * 256
-            base_page_no = addr >> 8
+            addr = dest_addr_lsb + dest_addr_msb << 8
+            base_page_no = high_byte(addr)
             addr += self.regs[REG_Y]
             addr %= 65536
-            new_page_no = addr >> 8
+            new_page_no = high_byte(addr)
             page_crossed = (new_page_no != base_page_no)
             
         elif mode == ACCUMULATOR:
@@ -475,7 +503,7 @@ class Emu6502(threading.Thread):
         return self.in_de_mem(addr, False)
 
     def add_val_to_acc_carry(self, val):
-        if self.regs[REG_S] & STATUS_CARRY != 0:
+        if self.get_status_bit(STATUS_CARRY) == 1:
             # there is a carry
             val += 1
         self.regs[REG_A] += val
@@ -501,7 +529,7 @@ class Emu6502(threading.Thread):
     def branch(self, status_bit, branch_if_zero):
         extra_cycles = 0
         do_branch = False
-        if self.regs[REG_S] & status_bit == 0:
+        if self.get_status_bit(status_bit) == 0:
             do_branch = True
         if not branch_if_zero:
             do_branch = not do_branch
@@ -511,10 +539,10 @@ class Emu6502(threading.Thread):
             if branch_addr & 0b10000000 != 0:
                 # negative number
                 branch_addr -= 256
-            base_page = self.prgm_ctr >> 8
+            base_page = high_byte(self.prgm_ctr)
             self.prgm_ctr += branch_addr
             self.prgm_ctr %= 65536
-            new_page = self.prgm_ctr >> 8
+            new_page = high_byte(self.prgm_ctr)
             if base_page == new_page:
                 extra_cycles = 1
             else:
@@ -535,6 +563,63 @@ class Emu6502(threading.Thread):
         self.update_zn_flag(self.regs[REG_A])
         self.set_status_bit(STATUS_CARRY, carry_on)
 
+    def hw_interrupt(self, maskable):
+        """
+        Maskable = true : IRQ
+        Maskable = false : NMI
+        """
+
+        # don't do anything if IRQ and IRQ has been disabled
+        if maskable and self.get_status_bit(STATUS_INTER) == 1:
+            return
+        
+        self.stack_push(high_byte(self.prgm_ctr))
+        self.stack_push(low_byte(self.prgm_ctr))
+        self.stack_push(self.regs[REG_S])
+        prgm_ctr_addr = 0xfffe
+        if maskable:
+            prgm_ctr_addr = 0xffe
+        self.prgm_ctr_ = self.mem[prgm_ctr_addr+1] << 8 + self.mem[prgm_ctr_addr]
+
+    def nmi(self):
+        self.set_status_bit(STATUS_BREAK, False)
+        return self.hw_interrupt(False)
+    
+    def irq(self):
+        self.set_status_bit(STATUS_BREAK, False)
+        return self.hw_interrupt(True)
+    
+    def brk(self):
+        """
+        Break is like an NMI, but instead to store PC in stack we store PC+2
+        So we increade PC by 2 and fwd to hw interrupt
+        """
+        self.set_status_bit(STATUS_BREAK, True)
+        self.prgm_ctr += 2
+        self.hw_interrupt(maskable=False)
+
+    def return_from_interrupt(self):
+        old_status = self.stack_pull()
+        curr_status = self.regs[REG_S]
+
+        # we want to keep the same value for bit 4 (break) and 5
+        status_ignore_mask = STATUS_BREAK & STATUS_BIT5
+        status_ignore_mask_bar = byte_not(status_ignore_mask)
+        # set to 1 the ignored bits
+        old_status |= status_ignore_mask
+        # set to 1 the unignored bits
+        curr_status |= status_ignore_mask_bar
+
+        self.regs[REG_S] = old_status & curr_status # = 0bxx11xxxx & 0b11yy1111 = 0bxxyyxxxx
+
+        self.set_status_bit(STATUS_BREAK, False)
+        self.set_status_bit(STATUS_BIT5, False)
+
+        pc_low = self.stack_pull()
+        pc_high = self.stack_pull()
+        self.prgm_ctr = pc_high << 8 + pc_low
+
+
     def dbg(self):
         print()
         inst = self.lst.get_inst(self.prgm_ctr)
@@ -550,14 +635,39 @@ class Emu6502(threading.Thread):
         if "bkpt" in inst:
             input()
 
+
+    def interrupt(self, maskable):
+        """
+        This will set the interrupt type, causing the trigger of an
+        hw interrupt at the next op execution
+        """
+        if maskable:
+            self.interrupt_type = INTERRUPT_IRQ
+        else:
+            self.interrupt_type = INTERRUPT_NMI
+
+
     def exec_inst(self):
         self.mem[0xfe] = int(random.random()*256) # RANDOM GEN
 
-        opcode = self.mem[self.prgm_ctr]
-        if opcode == 0x00:
-            # TODO : handle BRK in a better way (raise interrupt flag)
-            return -1
-        if not opcode in self.opcodes:
+        opcode = None
+
+        if self.interrupt_type != INTERRUPT_NO:
+            # hw interrupt is requested
+            # retreive the fake opcode to run the instruct
+            # as if it was any other function
+            if self.interrupt_type == INTERRUPT_IRQ:
+                opcode = OPCODE_IRQ
+            else:
+                opcode = OPCODE_NMI
+            # reset interrupt type
+            self.interrupt_type = INTERRUPT_NO
+        
+        else:
+            # no interrupt, run the next intruction normally
+            opcode = self.mem[self.prgm_ctr]
+
+        if opcode is None or opcode not in self.opcodes:
             raise Exception(f"Unknown opcode {hex(opcode)}")
         func, addr_mode, nbytes, base_ncycle, extra_cycle_type = self.opcodes[opcode]
         extra_cycle_nb = 0
@@ -579,6 +689,7 @@ class Emu6502(threading.Thread):
         self.prgm_ctr += nbytes
         time.sleep(0.000001)
         return ncycle
+
 
     def tick(self):
         # run instruction if we are at the beggining of the cycle
