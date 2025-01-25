@@ -8,9 +8,9 @@ def lst_addr_to_val(str_addr):
     return val
 
 class LstDebugger:
-    def __init__(self):
+    def __init__(self, lstfile):
         self.inst_map = {}
-        with open("test.lst", "r") as f:
+        with open(lstfile, "r") as f:
             
             for l in f.readlines():
                 if l[0] != '0':
@@ -22,7 +22,7 @@ class LstDebugger:
                 self.inst_map[addr] = inst
 
     def get_inst(self, addr):
-        prgm_addr = addr - 0x0800
+        prgm_addr = addr - 0x8000
         if prgm_addr not in self.inst_map:
             return "NOP"
         return self.inst_map[prgm_addr]

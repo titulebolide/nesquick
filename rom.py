@@ -3,7 +3,6 @@ class Rom:
         """
         mems is a list of length 2 tuples (startaddress, data)
         """
-        print(mems)
         for startaddr, data in mems:
             for index, val in enumerate(data):
                 emu.mem[startaddr + index] = val

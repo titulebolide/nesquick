@@ -35,8 +35,8 @@ YESEC = 1
 BRANCHEC = 2
 
 INTERRUPT_NO = 0
-INTERRUPT_IRQ = 0
-INTERRUPT_NMI = 0
+INTERRUPT_IRQ = 1
+INTERRUPT_NMI = 2
 
 OPCODE_IRQ = 0xffe
 OPCODE_NMI = 0xfff
@@ -59,10 +59,8 @@ class Emu6502(threading.Thread):
     def __init__(self, lst):
         super().__init__()
         self.lst = lst
-        self.prgm_start = 0x0800
-        self.prgm_file = "test.bin"
 
-        self.prgm_ctr = self.prgm_start
+        self.prgm_ctr = 0x8000 # todo use reset vec
         self.regs = [0,0,0,0]
         self.stack_ptr = 0xff
 
@@ -80,10 +78,10 @@ class Emu6502(threading.Thread):
         self.opcodes = {
             ## INTERRUPTS
             # fake opcode to handle hw interrupts
-            OPCODE_IRQ : [self.nmi, IMPLICIT, 0, 7, NOEC],
-            OPCODE_NMI : [self.irq, IMPLICIT, 0, 7, NOEC],
-            0x00: [self.break_, IMPLICIT, 0, 7, NOEC], # BRK : Like a jump, nbytes=0
-            0x40: [self.return_from_interrupt, IMPLICIT, 0, 6, NOEC],
+            OPCODE_IRQ : [self.irq, IMPLICIT, 0, 7, NOEC],
+            OPCODE_NMI : [self.nmi, IMPLICIT, 0, 7, NOEC],
+            0x00: [self.brk, IMPLICIT, 0, 7, NOEC], # BRK : Like a jump, nbytes=0
+            0x40: [self.rti, IMPLICIT, 0, 6, NOEC],
 
             0xea: [lambda : None, IMPLICIT, 1, 2, NOEC], # NOP
 
@@ -331,7 +329,7 @@ class Emu6502(threading.Thread):
             implicit_addr, _, _ = self.get_addr_val(ABSOLUTE)
             dest_addr_lsb = self.mem[implicit_addr]
             dest_addr_msb = self.mem[(implicit_addr + 1)%65536]
-            addr = dest_addr_lsb + dest_addr_msb << 8
+            addr = dest_addr_lsb + (dest_addr_msb << 8)
 
         elif mode == PRE_INDEX_INDIRECT:
             # or indexed indirect
@@ -339,7 +337,7 @@ class Emu6502(threading.Thread):
             implicit_addr, _, _ = self.get_addr_val(ZEROPAGE_X)
             dest_addr_lsb = self.mem[implicit_addr]
             dest_addr_msb = self.mem[(implicit_addr + 1)%65536]
-            addr = dest_addr_lsb + dest_addr_msb << 8
+            addr = dest_addr_lsb + (dest_addr_msb << 8)
 
         elif mode == POST_INDEX_INDIRECT:
             # or indirect indexed
@@ -348,7 +346,7 @@ class Emu6502(threading.Thread):
             implicit_addr, _, _ = self.get_addr_val(ZEROPAGE)
             dest_addr_lsb = self.mem[implicit_addr]
             dest_addr_msb = self.mem[(implicit_addr + 1)%65536]
-            addr = dest_addr_lsb + dest_addr_msb << 8
+            addr = dest_addr_lsb + (dest_addr_msb << 8)
             base_page_no = high_byte(addr)
             addr += self.regs[REG_Y]
             addr %= 65536
@@ -576,10 +574,11 @@ class Emu6502(threading.Thread):
         self.stack_push(high_byte(self.prgm_ctr))
         self.stack_push(low_byte(self.prgm_ctr))
         self.stack_push(self.regs[REG_S])
-        prgm_ctr_addr = 0xfffe
+        prgm_ctr_addr = 0xfffa
         if maskable:
-            prgm_ctr_addr = 0xffe
-        self.prgm_ctr_ = self.mem[prgm_ctr_addr+1] << 8 + self.mem[prgm_ctr_addr]
+            prgm_ctr_addr = 0xfffe
+        self.prgm_ctr = (self.mem[prgm_ctr_addr+1] << 8) + self.mem[prgm_ctr_addr]
+        print("in", hex(self.prgm_ctr), hex(self.mem[prgm_ctr_addr+1]), hex(self.mem[prgm_ctr_addr]))
 
     def nmi(self):
         self.set_status_bit(STATUS_BREAK, False)
@@ -598,7 +597,7 @@ class Emu6502(threading.Thread):
         self.prgm_ctr += 2
         self.hw_interrupt(maskable=False)
 
-    def return_from_interrupt(self):
+    def rti(self):
         old_status = self.stack_pull()
         curr_status = self.regs[REG_S]
 
@@ -617,21 +616,25 @@ class Emu6502(threading.Thread):
 
         pc_low = self.stack_pull()
         pc_high = self.stack_pull()
-        self.prgm_ctr = pc_high << 8 + pc_low
+        self.prgm_ctr = (pc_high << 8) + pc_low
 
 
     def dbg(self):
         print()
         inst = self.lst.get_inst(self.prgm_ctr)
         print(inst)
-        print("PC :", hex(self.prgm_ctr),
-              "\tinst :", hex(self.mem[self.prgm_ctr]),
-              "\tA :", hex(self.regs[REG_A]),
-              "\tX :", hex(self.regs[REG_X]),
-              "\tY :", hex(self.regs[REG_Y]),
-              "\tS :", bin(self.regs[REG_S]),
-              "\tSP :", hex(self.stack_ptr))
-        print("mem: ", *[dec2hex(i) for i in self.mem[0x00:0x10]])
+        print("PC\tinst\tA\tX\tY\tS\tSP")
+        print(
+            hex(self.prgm_ctr),
+            hex(self.mem[self.prgm_ctr]),
+            hex(self.regs[REG_A]),
+            hex(self.regs[REG_X]),
+            hex(self.regs[REG_Y]),
+            bin(self.regs[REG_S]),
+            hex(self.stack_ptr),
+            sep="\t"
+        )
+        # print("mem: ", *[dec2hex(i) for i in self.mem[0x00:0x10]])
         if "bkpt" in inst:
             input()
 
@@ -651,7 +654,6 @@ class Emu6502(threading.Thread):
         self.mem[0xfe] = int(random.random()*256) # RANDOM GEN
 
         opcode = None
-
         if self.interrupt_type != INTERRUPT_NO:
             # hw interrupt is requested
             # retreive the fake opcode to run the instruct
@@ -685,9 +687,9 @@ class Emu6502(threading.Thread):
                 if page_crossed:
                     extra_cycle_nb = 1
         ncycle = base_ncycle + extra_cycle_nb
-        # self.dbg()
+        self.dbg()
         self.prgm_ctr += nbytes
-        time.sleep(0.000001)
+        time.sleep(1)
         return ncycle
 
 
