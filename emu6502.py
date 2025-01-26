@@ -60,7 +60,7 @@ class Emu6502(threading.Thread):
         super().__init__()
         self.lst = lst
 
-        self.prgm_ctr = 0x8000 # todo use reset vec
+        self.prgm_ctr = -1 # init at an invalid value to force reset
         self.regs = [0,0,0,0]
         self.stack_ptr = 0xff
 
@@ -649,6 +649,10 @@ class Emu6502(threading.Thread):
         else:
             self.interrupt_type = INTERRUPT_NMI
 
+    def reset(self):
+        reset_vector = 0xfffc
+        self.prgm_ctr = (self.mem[reset_vector+1] << 8) + self.mem[reset_vector]
+        print(hex(self.prgm_ctr))
 
     def exec_inst(self):
         self.mem[0xfe] = int(random.random()*256) # RANDOM GEN
