@@ -12,3 +12,10 @@ def mems_from_file(filename, start_addr):
     with open(filename, "rb") as f:
         return [(start_addr, f.read()),]
 
+from inesparser import parse_ines
+
+class InesRom(Rom):
+    def __init__(self, inesfile, emu):
+        prg, chr = parse_ines(inesfile)
+        # NROM : rom starts at 0x8000
+        super().__init__(emu, [(0x8000, prg)])

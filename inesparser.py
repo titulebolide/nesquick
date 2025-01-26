@@ -1,12 +1,12 @@
 import matplotlib.pyplot as plt
 import numpy as np
 
-def parseHeader(header):
+def parse_header(header):
     prg_len = header[4] * 16384
     chr_len = header[5] * 8192
     return prg_len, chr_len
 
-def parseInes(filename):
+def parse_ines(filename):
     """
     https://www.nesdev.org/wiki/INES
     """
@@ -19,7 +19,7 @@ def parseInes(filename):
         raise Exception("Bad file header")
     
     header = data[0:16]
-    prg_len, chr_len = parseHeader(header)
+    prg_len, chr_len = parse_header(header)
 
     if len(data) != chr_len + prg_len + 16:
         print(len(data), chr_len + prg_len + 16)
@@ -29,10 +29,11 @@ def parseInes(filename):
     chr = data[prg_len+16:chr_len+prg_len+16]
     return prg, chr    
 
-def showChr(chr):
+def ines_show_chr(chr):
     tile = np.zeros((32*8, 16*8))
     # x is left to right
     # y is up to down
+    # but for imshow x is up to down, y is left to right
     for tile_y in range(32):
         for tile_x in range(16):
             tile_no = tile_x + tile_y * 16
@@ -55,9 +56,13 @@ def showChr(chr):
                         color = 1 
 
                     tile[tile_y*8 + j, tile_x*8 + (7-i)] = color
-    plt.imshow(tile)
+    plt.subplot(1,2,1)
+    plt.imshow(tile[:16*8])
+    plt.subplot(1,2,2)
+    plt.imshow(tile[16*8:])
     plt.show()
 
-prg,chr = parseInes("nes-hello-world/build/starter.nes")
-print(chr)
-showChr(chr)
+if __name__ == "__main__":
+    prg,chr = parse_ines("donkeykong.nes")
+    print(chr)
+    ines_show_chr(chr)
