@@ -34,10 +34,12 @@ NOEC = 0
 YESEC = 1
 BRANCHEC = 2
 
-INTERRUPT_NO = 0
-INTERRUPT_IRQ = 1
-INTERRUPT_NMI = 2
+INTERRUPT_NO = 0 # No interrupt
+INTERRUPT_IRQ = 1 # Interrupt ReQuest
+INTERRUPT_NMI = 2 # Non maskable interrupt
+INTERRUPT_RST = 3 # Reset
 
+OPCODE_RST = 0xffd
 OPCODE_IRQ = 0xffe
 OPCODE_NMI = 0xfff
 
@@ -55,24 +57,64 @@ def low_byte(val):
 
 def high_byte(val):
     return val // 256
+
+class Memory:
+    def __init__(self, memory_map):
+        """
+        Memory map is a list of tuples
+        (startaddr, device)
+        From lowest startaddr to greatest
+        """
+        self.mmap = memory_map
+        # reverse the list to ease device search
+        # search from the biggest addr and stop at the
+        # first one lowest than the addr were looking for
+        self.mmap.reverse()
+
+    def address_resolve(self, cpuaddr):
+        for startaddr, device in self.mmap:
+            if cpuaddr >= startaddr:
+                return cpuaddr - startaddr, device
+        print([i[0] for i in self.mmap], cpuaddr)
+        raise Exception("Bad memory map (couldn't find stuitable device for requested addr)")
+
+    def __getitem__(self, index):
+        if type(index) == slice:
+            dev_addr, dev = self.address_resolve(index.start)
+            dev_addr2, dev2 = self.address_resolve(index.stop - 1)
+            if dev != dev2:
+                raise Exception("The used slice overlaps several devices")
+            return dev[dev_addr:dev_addr2 + 1]
+        else:
+            dev_addr, dev = self.address_resolve(index)
+        return dev[dev_addr]
+
+    def __setitem__(self, index, value):
+        if type(index) == slice:
+            raise Exception("Memory setitem don't support slices")
+        dev_addr, dev = self.address_resolve(index)
+        dev[dev_addr] = value
+
 class Emu6502(threading.Thread):
-    def __init__(self, lst):
+    def __init__(self, memory_map, lst = None):
         super().__init__()
         self.lst = lst
 
-        self.prgm_ctr = -1 # init at an invalid value to force reset
         self.regs = [0,0,0,0]
         self.stack_ptr = 0xff
 
-        self.mem = [0]*(2**16)
-
-        self.instuction_cycle = 0
-        self.instruction_nbcycles = 0
+        # Currently unset, will be set with the power-on reset
+        self.prgm_ctr = None
 
         # if no HW interrupt (understand : no external interrupt)
         # set to INTERRUPT_NO
         # else, it will save the interrupt type
-        self.interrupt_type = INTERRUPT_NO 
+        self.interrupt_type = INTERRUPT_RST 
+
+        self.mem = Memory(memory_map)
+
+        self.instuction_cycle = 0
+        self.instruction_nbcycles = 0
 
         # operation, nbytes, ncycles, extracycles
         self.opcodes = {
@@ -80,6 +122,8 @@ class Emu6502(threading.Thread):
             # fake opcode to handle hw interrupts
             OPCODE_IRQ : [self.irq, IMPLICIT, 0, 7, NOEC],
             OPCODE_NMI : [self.nmi, IMPLICIT, 0, 7, NOEC],
+            OPCODE_RST : [self.reset, IMPLICIT, 0, 7, NOEC], # TODO : Check if reset is actually 7 cycles long
+
             0x00: [self.brk, IMPLICIT, 0, 7, NOEC], # BRK : Like a jump, nbytes=0
             0x40: [self.rti, IMPLICIT, 0, 6, NOEC],
 
@@ -620,9 +664,9 @@ class Emu6502(threading.Thread):
 
 
     def dbg(self):
+        if self.prgm_ctr is None:
+            return
         print()
-        inst = self.lst.get_inst(self.prgm_ctr)
-        print(inst)
         print("PC\tinst\tA\tX\tY\tS\tSP")
         print(
             hex(self.prgm_ctr),
@@ -635,8 +679,11 @@ class Emu6502(threading.Thread):
             sep="\t"
         )
         # print("mem: ", *[dec2hex(i) for i in self.mem[0x00:0x10]])
-        if "bkpt" in inst:
-            input()
+        if self.lst is not None:
+            inst = self.lst.get_inst(self.prgm_ctr)
+            print(inst)
+            if "bkpt" in inst:
+                input()
 
 
     def interrupt(self, maskable):
@@ -655,7 +702,7 @@ class Emu6502(threading.Thread):
         print(hex(self.prgm_ctr))
 
     def exec_inst(self):
-        self.mem[0xfe] = int(random.random()*256) # RANDOM GEN
+        self.dbg()
 
         opcode = None
         if self.interrupt_type != INTERRUPT_NO:
@@ -664,8 +711,10 @@ class Emu6502(threading.Thread):
             # as if it was any other function
             if self.interrupt_type == INTERRUPT_IRQ:
                 opcode = OPCODE_IRQ
-            else:
+            elif self.interrupt_type == INTERRUPT_NMI:
                 opcode = OPCODE_NMI
+            elif self.interrupt_type == INTERRUPT_RST:
+                opcode = OPCODE_RST
             # reset interrupt type
             self.interrupt_type = INTERRUPT_NO
         
@@ -691,9 +740,7 @@ class Emu6502(threading.Thread):
                 if page_crossed:
                     extra_cycle_nb = 1
         ncycle = base_ncycle + extra_cycle_nb
-        self.dbg()
         self.prgm_ctr += nbytes
-        time.sleep(1)
         return ncycle
 
 

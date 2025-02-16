@@ -4,10 +4,10 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 from emu6502 import Emu6502
-from lstdebug import LstDebugger
-import rom
 
 import threading
+
+import random
 
 plt.rcParams['keymap.save'].remove('s')
 plt.rcParams['keymap.quit'].remove('q')
@@ -48,35 +48,51 @@ class AnimatedImshow:
         plt.show()
 
 
-l = LstDebugger()
+# l = LstDebugger()
 
-emu = Emu6502(l)
+with open("rom/snake/test.bin", "rb") as f:
+    rom = f.read()
 
-m = AnimatedImshow(emu)
-
-r = rom.Rom(emu, rom.mems_from_file("test.bin", 0x0800))
+class RandomGen:
+    def __getitem__(self, value):
+        return int(random.random()*256)
 
 import evdev
-dev = evdev.InputDevice('/dev/input/event4')
+class KbDevice(threading.Thread):
+    def __init__(self):
+        super().__init__()
+        self.asciival = 0
 
-print(dev)
-
-def readkb():
-    for event in dev.read_loop():
-        if event.type == evdev.ecodes.EV_KEY:
-
+    def run(self):
+        dev = evdev.InputDevice('/dev/input/event4')
+        for event in dev.read_loop():
+            if event.type != evdev.ecodes.EV_KEY:
+                continue
             key = evdev.ecodes.KEY[event.code][4:]
             if len(key) != 1:
                 continue
             if event.value != 1: #press down
                 continue
-            asciival = ord(key.lower())
-            emu.mem[0xff] = asciival
+            self.asciival = ord(key.lower())
 
-kbthread = threading.Thread(target=readkb)
-kbthread.start()
+    def __getitem__(self, value):
+        return self.asciival
 
+kb = KbDevice()
 
+mmap = [
+    (0x0000, [0]*(1<<15)),
+    (0xfe, RandomGen()),
+    (0xff, kb),
+    (0x100, [0]*(1<<15)),
+    (0x8000, rom),
+]
+
+emu = Emu6502(mmap)
+
+m = AnimatedImshow(emu)
+
+kb.start()
 emu.start()
 m.animate()
-kbthread.join()
+kb.join()

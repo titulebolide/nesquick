@@ -63,6 +63,6 @@ def ines_show_chr(chr):
     plt.show()
 
 if __name__ == "__main__":
-    prg,chr = parse_ines("donkeykong.nes")
+    prg,chr = parse_ines("rom/donkeykong.nes")
     print(chr)
     ines_show_chr(chr)
