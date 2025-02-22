@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import matplotlib.animation as animation
 
 from emu6502 import Emu6502
+import evdev
 
 import threading
 
@@ -35,7 +36,7 @@ class AnimatedImshow:
         Parameters:
         - frame: The current frame index.
         """
-        mat = np.array(self.data_provider.mem[0x0200:0x0600]).reshape((32,32))
+        mat = np.array(self.data_provider.mem).reshape((32,32))
         self.im.set_array(mat)
         return [self.im]
 
@@ -53,11 +54,10 @@ class AnimatedImshow:
 with open("rom/snake/test.bin", "rb") as f:
     rom = f.read()
 
-class RandomGen:
+class RandomDevice:
     def __getitem__(self, value):
         return int(random.random()*256)
 
-import evdev
 class KbDevice(threading.Thread):
     def __init__(self):
         super().__init__()
@@ -78,19 +78,33 @@ class KbDevice(threading.Thread):
     def __getitem__(self, value):
         return self.asciival
 
+class DisplayDevice():
+    def __init__(self):
+        self.mem = [0]*0x400
+        
+    def __setitem__(self, key, value):
+        self.mem[key] = value
+    
+    def __getitem__(self, key):
+        return self.mem[key]
+    
+
 kb = KbDevice()
+dd = DisplayDevice()
 
 mmap = [
     (0x0000, [0]*(1<<15)),
-    (0xfe, RandomGen()),
+    (0xfe, RandomDevice()),
     (0xff, kb),
-    (0x100, [0]*(1<<15)),
+    (0x100, [0]*0x100),
+    (0x200, dd),
+    (0x600, [0]*0x8000),
     (0x8000, rom),
 ]
 
 emu = Emu6502(mmap)
 
-m = AnimatedImshow(emu)
+m = AnimatedImshow(dd)
 
 kb.start()
 emu.start()
