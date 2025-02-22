@@ -102,7 +102,7 @@ mmap = [
     (0x8000, rom),
 ]
 
-emu = Emu6502(mmap)
+emu = Emu6502(mmap, debug=True)
 
 m = AnimatedImshow(dd)
 
