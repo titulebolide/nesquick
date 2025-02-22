@@ -6,4 +6,4 @@
 self.mem[addr] = val
 self.mem[addr] %= 256
 ```
-must be avoided. We are trying here to emulate a single write, and we actually do two writes and one read!
+must be avoided. We are trying here to emulate a single write, and we actually do two writes and one read! (see commit f46925bb for reference)
