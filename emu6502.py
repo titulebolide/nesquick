@@ -1,6 +1,4 @@
 import threading
-import random
-import time
 
 REG_A = 0
 REG_X = 1
@@ -37,7 +35,7 @@ BRANCHEC = 2
 INTERRUPT_NO = 0 # No interrupt
 INTERRUPT_IRQ = 1 # Interrupt ReQuest
 INTERRUPT_NMI = 2 # Non maskable interrupt
-INTERRUPT_RST = 3 # Reset
+INTERRUPT_RST = 3 # Reset (not actually an interrupt but it is handy to handle it this way)
 
 OPCODE_RST = 0xffd
 OPCODE_IRQ = 0xffe
@@ -96,8 +94,9 @@ class Memory:
         dev[dev_addr] = value
 
 class Emu6502(threading.Thread):
-    def __init__(self, memory_map, lst = None):
+    def __init__(self, memory_map, lst = None, debug = False):
         super().__init__()
+        self.debug = debug
         self.lst = lst
 
         self.regs = [0,0,0,0]
@@ -340,7 +339,7 @@ class Emu6502(threading.Thread):
             return 1
         return 0
 
-    def get_addr_val(self, mode):
+    def get_addr(self, mode):
         page_crossed = False
         
         if mode in (ABSOLUTE, ABSOLUTE_X, ABSOLUTE_Y):
@@ -370,7 +369,7 @@ class Emu6502(threading.Thread):
             # where there is the lsb of the address we are looking for
             # the msb is at the next address
             # fist we recover the given implici addr:
-            implicit_addr, _, _ = self.get_addr_val(ABSOLUTE)
+            implicit_addr, _ = self.get_addr(ABSOLUTE)
             dest_addr_lsb = self.mem[implicit_addr]
             dest_addr_msb = self.mem[(implicit_addr + 1)%65536]
             addr = dest_addr_lsb + (dest_addr_msb << 8)
@@ -378,7 +377,7 @@ class Emu6502(threading.Thread):
         elif mode == PRE_INDEX_INDIRECT:
             # or indexed indirect
             # implicit addr is a ZEROPAGE_X
-            implicit_addr, _, _ = self.get_addr_val(ZEROPAGE_X)
+            implicit_addr, _ = self.get_addr(ZEROPAGE_X)
             dest_addr_lsb = self.mem[implicit_addr]
             dest_addr_msb = self.mem[(implicit_addr + 1)%65536]
             addr = dest_addr_lsb + (dest_addr_msb << 8)
@@ -387,7 +386,7 @@ class Emu6502(threading.Thread):
             # or indirect indexed
             # implicit addr is a ZEROPAGE
             # the address we found there is offset by REG_Y
-            implicit_addr, _, _ = self.get_addr_val(ZEROPAGE)
+            implicit_addr, _ = self.get_addr(ZEROPAGE)
             dest_addr_lsb = self.mem[implicit_addr]
             dest_addr_msb = self.mem[(implicit_addr + 1)%65536]
             addr = dest_addr_lsb + (dest_addr_msb << 8)
@@ -396,21 +395,18 @@ class Emu6502(threading.Thread):
             addr %= 65536
             new_page_no = high_byte(addr)
             page_crossed = (new_page_no != base_page_no)
-            
-        elif mode == ACCUMULATOR:
-            val = self.regs[REG_A]
-            return None, val, False
 
         elif mode == IMMEDIATE:
-            val = self.mem[self.prgm_ctr+1]
-            return None, val, False
+            # the actual address for immediate addr is next value
+            return self.prgm_ctr+1, False
 
         else:
             # relative addressing is only used for branching
             # implicit addressing is operation dependent
+            # "accumulator" special addressing is handled separatly
             raise Exception
         
-        return addr, self.mem[addr], page_crossed
+        return addr, page_crossed
     
     def update_zn_flag(self, value):
         self.set_status_bit(STATUS_ZERO, value == 0)
@@ -419,7 +415,7 @@ class Emu6502(threading.Thread):
     def clear(self, status_bit):
         self.set_status_bit(status_bit, False)
     
-    def jmp(self, addr, val):
+    def jmp(self, addr):
         self.prgm_ctr = addr
             
     def stack_push(self, val):
@@ -432,9 +428,9 @@ class Emu6502(threading.Thread):
         stack_addr = self.stack_ptr + 0x0100
         return self.mem[stack_addr]
 
-    def jsr(self, addr, val):
+    def jsr(self, addr):
         self.stack_push(self.prgm_ctr + 2)
-        self.jmp(addr, val)
+        self.jmp(addr)
 
     def rts(self):
         addr = self.stack_pull()
@@ -456,40 +452,41 @@ class Emu6502(threading.Thread):
             # for REG_S it is already handled!
             self.update_zn_flag(val)
 
-    def bit(self, addr, val):
+    def bit(self, addr):
         # https://www.masswerk.at/6502/6502_instruction_set.html#bitcompare
         acc = self.regs[REG_A]
+        val = self.mem[addr]
         self.set_status_bit(STATUS_ZERO, acc & val == 0)
         self.set_status_bit(STATUS_NEG, val & 0b10000000 != 0)
         self.set_status_bit(STATUS_OVFLO, val & 0b01000000 != 0)
 
-    def ld(self, reg, val):
+    def load(self, reg, val):
         # load accumulator
         self.regs[reg] = val
         self.update_zn_flag(val)
 
-    def lda(self, addr, val):
-        return self.ld(REG_A, val)
+    def lda(self, addr):
+        return self.load(REG_A, self.mem[addr])
 
-    def ldx(self, addr, val):
-        return self.ld(REG_X, val)
+    def ldx(self, addr):
+        return self.load(REG_X, self.mem[addr])
     
-    def ldy(self, addr, val):
-        return self.ld(REG_Y, val)
+    def ldy(self, addr):
+        return self.load(REG_Y, self.mem[addr])
     
-    def st(self, reg, addr):
+    def store(self, reg, addr):
         val = self.regs[reg]
         self.mem[addr] = val
         self.update_zn_flag(val)
 
-    def sta(self, addr, val):
-        return self.st(REG_A, addr)   
+    def sta(self, addr):
+        return self.store(REG_A, addr)   
     
-    def stx(self, addr, val):
-        return self.st(REG_X, addr)
+    def stx(self, addr):
+        return self.store(REG_X, addr)
     
-    def sty(self, addr, val):
-        return self.st(REG_Y, addr)
+    def sty(self, addr):
+        return self.store(REG_Y, addr)
     
     def tr(self, sreg, dreg):
         val = self.regs[sreg]
@@ -500,14 +497,14 @@ class Emu6502(threading.Thread):
         diff = self.regs[reg] - val
         self.update_zn_flag(diff) #status_zero goes to 0 if equality
 
-    def cpa(self, addr, val):
-        return self.cp(REG_A, val)
+    def cpa(self, addr):
+        return self.cp(REG_A, self.mem[addr])
     
-    def cpx(self, addr, val):
-        return self.cp(REG_X, val)
+    def cpx(self, addr):
+        return self.cp(REG_X, self.mem[addr])
     
-    def cpy(self, addr, val):
-        return self.cp(REG_Y, val)
+    def cpy(self, addr):
+        return self.cp(REG_Y, self.mem[addr])
 
     def in_de_reg(self, reg, sign_plus):
         # increase or decrease handler
@@ -538,10 +535,10 @@ class Emu6502(threading.Thread):
         self.mem[addr] %= 256
         self.update_zn_flag(self.mem[addr])
 
-    def inc(self, addr, val):
+    def inc(self, addr):
         return self.in_de_mem(addr, True)
     
-    def dec(self, addr, val):
+    def dec(self, addr):
         return self.in_de_mem(addr, False)
 
     def add_val_to_acc_carry(self, val):
@@ -553,19 +550,19 @@ class Emu6502(threading.Thread):
         self.regs[REG_A] %= 256
         self.update_zn_flag(self.regs[REG_A])
 
-    def adc(self, addr, val):
-        self.add_val_to_acc_carry(val)
+    def adc(self, addr):
+        self.add_val_to_acc_carry(self.mem[addr])
 
-    def sbc(self, addr, val):
+    def sbc(self, addr):
         # use two's complement https://stackoverflow.com/a/41253661
-        self.add_val_to_acc_carry(byte_not(val))
+        self.add_val_to_acc_carry(byte_not(self.mem[addr]))
 
-    def and_(self, addr, val):
-        self.regs[REG_A] &= val
+    def and_(self, addr):
+        self.regs[REG_A] &= self.mem[addr]
         self.update_zn_flag(self.regs[REG_A])
 
-    def or_(self, addr, val):
-        self.regs[REG_A] |= val
+    def or_(self, addr):
+        self.regs[REG_A] |= self.mem[addr]
         self.update_zn_flag(self.regs[REG_A])
 
     def branch(self, status_bit, branch_if_zero):
@@ -591,7 +588,7 @@ class Emu6502(threading.Thread):
                 extra_cycles = 2
         return extra_cycles
 
-    def shift_right_memory(self, addr, val):
+    def shift_right_memory(self, addr):
         # carry if lsb set
         carry_on = (self.mem[addr] & 0b00000001 != 0)
         self.mem[addr] >>= 1
@@ -702,7 +699,8 @@ class Emu6502(threading.Thread):
         print(hex(self.prgm_ctr))
 
     def exec_inst(self):
-        self.dbg()
+        if self.debug:
+            self.dbg()
 
         opcode = None
         if self.interrupt_type != INTERRUPT_NO:
@@ -735,12 +733,13 @@ class Emu6502(threading.Thread):
                 func()
             else:
                 # functions that uses addressing
-                addr, val, page_crossed = self.get_addr_val(addr_mode)
-                func(addr, val)
+                addr, page_crossed = self.get_addr(addr_mode)
+                func(addr)
                 if page_crossed:
                     extra_cycle_nb = 1
         ncycle = base_ncycle + extra_cycle_nb
         self.prgm_ctr += nbytes
+        # input()
         return ncycle
 
 
