@@ -528,12 +528,14 @@ class Emu6502(threading.Thread):
         return self.in_de_reg(REG_Y, False)
     
     def in_de_mem(self, addr, sign_plus):
+        val = self.mem[addr]
         if sign_plus:
-            self.mem[addr] += 1
+            val += 1
         else:
-            self.mem[addr] -= 1
-        self.mem[addr] %= 256
-        self.update_zn_flag(self.mem[addr])
+            val -= 1
+        val %= 256
+        self.mem[addr] = val
+        self.update_zn_flag(val)
 
     def inc(self, addr):
         return self.in_de_mem(addr, True)
@@ -590,9 +592,11 @@ class Emu6502(threading.Thread):
 
     def shift_right_memory(self, addr):
         # carry if lsb set
-        carry_on = (self.mem[addr] & 0b00000001 != 0)
-        self.mem[addr] >>= 1
-        self.update_zn_flag(self.mem[addr])
+        val = self.mem[addr]
+        carry_on = (val & 0b00000001 != 0)
+        val >>= 1
+        self.mem[addr] = val
+        self.update_zn_flag(val)
         self.set_status_bit(STATUS_CARRY, carry_on)
 
     def shift_right_accumulator(self):
@@ -619,7 +623,6 @@ class Emu6502(threading.Thread):
         if maskable:
             prgm_ctr_addr = 0xfffe
         self.prgm_ctr = (self.mem[prgm_ctr_addr+1] << 8) + self.mem[prgm_ctr_addr]
-        print("in", hex(self.prgm_ctr), hex(self.mem[prgm_ctr_addr+1]), hex(self.mem[prgm_ctr_addr]))
 
     def nmi(self):
         self.set_status_bit(STATUS_BREAK, False)
