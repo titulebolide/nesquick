@@ -178,6 +178,17 @@ class Emu6502(threading.Thread):
             0x11: [self.or_, POST_INDEX_INDIRECT, 2, 5, YESEC],
 
 
+            ## EOR
+            0x49: [self.eor, IMMEDIATE, 2, 2, NOEC],
+            0x45: [self.eor, ZEROPAGE, 2, 3, NOEC], 
+            0x55: [self.eor, ZEROPAGE_X, 2, 4, NOEC],
+            0x4D: [self.eor, ABSOLUTE, 3, 4, NOEC],
+            0x5D: [self.eor, ABSOLUTE_X, 3, 4, YESEC],
+            0x59: [self.eor, ABSOLUTE_Y, 3, 4, YESEC],
+            0x41: [self.eor, PRE_INDEX_INDIRECT, 2, 6, NOEC],
+            0x51: [self.eor, POST_INDEX_INDIRECT, 2, 5, YESEC],
+
+
             ## CLEAR STATUS
             0x18: [lambda : self.set_status_bit(STATUS_CARRY, False), IMPLICIT, 1, 2, NOEC], # CLC
             0xd8: [lambda : self.set_status_bit(STATUS_DEC, False), IMPLICIT, 1, 2, NOEC], # CLD
@@ -565,6 +576,10 @@ class Emu6502(threading.Thread):
 
     def or_(self, addr):
         self.regs[REG_A] |= self.mem[addr]
+        self.update_zn_flag(self.regs[REG_A])
+
+    def eor(self, addr):
+        self.regs[REG_A] ^= self.mem[addr]
         self.update_zn_flag(self.regs[REG_A])
 
     def branch(self, status_bit, branch_if_zero):
