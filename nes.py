@@ -32,6 +32,8 @@ mmap = [
 
 emu = emu6502.Emu6502(mmap, debug=True)
 
+dev.set_cpu_interrupt(emu.interrupt)
+
 while True:
     emu.tick()
     dev.tick()

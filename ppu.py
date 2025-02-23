@@ -1,8 +1,11 @@
 KEY_PPUCTRL = 0
+KEY_PPUSTATUS = 2
 KEY_OAMADDR = 3
+KEY_OAMDATA = 4
+KEY_PPUSCROLL = 5
 KEY_PPUADDR = 6
 KEY_PPUDATA = 7
-KEY_OAMDATA = 0x2014
+KEY_OAMDMA = 0x2014
 
 PPUCTRL_VRAMINC = 0b00000010
 
@@ -10,13 +13,18 @@ PPUCTRL_VRAMINC = 0b00000010
 
 class PpuApuIODevice:
     def __init__(self):
-        self.mem = [0]*2018
+        self.cpu_interrupt = None
+
         self.vram = [0]*0x4000 # 14 bit addr space
         self.ntick = 0
         self.ppu_reg_w = 0
         self.ppuaddr = 0
         self.ppuctrl = 0
+        self.ppustatus = 0
         self.ppudata_buffer = 0 # ppudata does not read directly ram but a buffer that is updated after each read
+
+    def set_cpu_interrupt(self, cpu_interrupt):
+        self.cpu_interrupt = cpu_interrupt
 
     def get_ppuctrl_bit(self, status_bit):
         if self.ppuctrl & status_bit != 0:
@@ -30,10 +38,9 @@ class PpuApuIODevice:
             self.ppuaddr += 1
 
     def __setitem__(self, key, value):
-        self.mem[key] = value
-        
         if key == KEY_PPUCTRL:
-            self.ppuctrl = value    
+            print("PPUCTRL")
+            self.ppuctrl = value
 
         elif key == KEY_OAMADDR:
             print("OAMADDR")
@@ -58,14 +65,19 @@ class PpuApuIODevice:
             self.inc_ppuaddr()
             print(hex(self.ppuaddr))
 
+        elif key == KEY_OAMADDR:
+            print("OAMADDR")
+
         elif key == KEY_OAMDATA:
-            # OAMDMA
+            print("OAMDATA")
+
+        elif key == KEY_OAMDMA:
             print("OAMDMA")
+            input()
 
         else:
             print("Unhandled dev reg", key)
 
-        # input()
 
     def __getitem__(self, key):
         if key == KEY_PPUDATA:
@@ -77,8 +89,12 @@ class PpuApuIODevice:
             self.inc_ppuaddr()
             return ret
 
+        elif key == KEY_PPUSTATUS:
+            print("PPUSTATUS")
+            return self.ppustatus
+
         else:
-            ret = self.mem[key]
+            ret = 0 # TODO
         # if key == 2:
         #     # PPU STATUS
         #     pass
@@ -93,6 +109,10 @@ class PpuApuIODevice:
     def tick(self):
         self.ntick += 1
         if self.ntick == 100:
-            self.mem[2] = 0b10000000
+            self.ppustatus = 0b10000000
+            
+        if self.ntick == 200000:
+            self.cpu_interrupt(maskable = False)
+            print("Calling NMI")
         # print(self.ntick)
         # print(self.mem[1:10])

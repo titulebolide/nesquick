@@ -690,6 +690,7 @@ class Emu6502(threading.Thread):
         """
         This will set the interrupt type, causing the trigger of an
         hw interrupt at the next op execution
+        Made to be called externally
         """
         if maskable:
             self.interrupt_type = INTERRUPT_IRQ
