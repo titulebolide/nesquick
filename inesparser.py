@@ -34,35 +34,43 @@ def ines_show_chr(chr):
     # x is left to right
     # y is up to down
     # but for imshow x is up to down, y is left to right
-    for tile_y in range(32):
-        for tile_x in range(16):
-            tile_no = tile_x + tile_y * 16
-            plane0_addr = (tile_no) << 4
-            print(plane0_addr, plane0_addr+16)
-            plane0 = chr[plane0_addr:plane0_addr+8]
-            plane1 = chr[plane0_addr+8:plane0_addr+16]
-            # print(bin(plane0), bin(plane1))
-            for i in range(8):
-                for j in range(8):
-                    color0 = (plane0[j] >> i) & 1
-                    color1 = (plane1[j] >> i) & 1
-                    color = (color1 << 1) + color0
-                    
-                    # increase color value to separate from the bg
-                    if color != 0:
-                        color += 4
-                    # if transparent (color 0, change to 1 every two to have a checkerboard)
-                    elif (tile_y + tile_x) %2 == 0 :
-                        color = 1 
+    for sprite_y in range(32):
+        for sprite_x in range(16):
+            tile_x = sprite_y*8
+            tile_y = sprite_x*8
+            tile[tile_x:tile_x+8, tile_y:tile_y+8] = ines_get_sprite(chr, sprite_x + sprite_y * 16, 0)
 
-                    tile[tile_y*8 + j, tile_x*8 + (7-i)] = color
     plt.subplot(1,2,1)
     plt.imshow(tile[:16*8])
     plt.subplot(1,2,2)
     plt.imshow(tile[16*8:])
     plt.show()
 
+def ines_get_sprite(chr, tile_index, table_no, doubletile=False):
+    """
+    doubletile : 16x8 tile mode
+    """
+    sprite = np.zeros((8,8))
+    plane0_addr = (tile_index + 256*table_no) << 4
+    plane0 = chr[plane0_addr:plane0_addr+8]
+    plane1 = chr[plane0_addr+8:plane0_addr+16]
+    for i in range(8):
+        for j in range(8):
+            color0 = (plane0[j] >> i) & 1
+            color1 = (plane1[j] >> i) & 1
+            color = (color1 << 1) + color0
+            
+            # increase color value to separate from the bg
+            if color != 0:
+                color += 4
+            # if transparent (color 0, change to 1 every two to have a checkerboard)
+            # elif (tile_y + tile_x) %2 == 0 :
+            #     color = 1 
+
+            sprite[j, 7-i] = color
+    return sprite
+
 if __name__ == "__main__":
-    prg,chr = parse_ines("rom/donkeykong.nes")
-    print(chr)
+    # prg,chr = parse_ines("rom/donkeykong.nes")
+    prg,chr = parse_ines("rom/hello-world/build/starter.nes")
     ines_show_chr(chr)
