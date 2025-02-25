@@ -73,7 +73,6 @@ class Memory:
         for startaddr, device in self.mmap:
             if cpuaddr >= startaddr:
                 return cpuaddr - startaddr, device
-        print([i[0] for i in self.mmap], cpuaddr)
         raise Exception("Bad memory map (couldn't find stuitable device for requested addr)")
 
     def __getitem__(self, index):
@@ -204,11 +203,32 @@ class Emu6502(threading.Thread):
 
             ## BIT SHIFT
             # LSR
-            0x4a: [self.shift_right_accumulator, ACCUMULATOR, 1, 2, NOEC],
-            0x46: [self.shift_right_memory, ZEROPAGE, 2, 5, NOEC],
-            0x56: [self.shift_right_memory, ZEROPAGE_X, 2, 6, NOEC],
-            0x4e: [self.shift_right_memory, ABSOLUTE, 3, 6, NOEC],
-            0x5e: [self.shift_right_memory, ABSOLUTE_X, 3, 7, NOEC],
+            0x4a: [self.func_with_acc(self.shift_right), ACCUMULATOR, 1, 2, NOEC],
+            0x46: [self.func_with_mem(self.shift_right), ZEROPAGE, 2, 5, NOEC],
+            0x56: [self.func_with_mem(self.shift_right), ZEROPAGE_X, 2, 6, NOEC],
+            0x4e: [self.func_with_mem(self.shift_right), ABSOLUTE, 3, 6, NOEC],
+            0x5e: [self.func_with_mem(self.shift_right), ABSOLUTE_X, 3, 7, NOEC],
+
+            # ASL
+            0x0a: [self.func_with_acc(self.shift_left), ACCUMULATOR, 1, 2, NOEC],
+            0x06: [self.func_with_mem(self.shift_left), ZEROPAGE, 2, 5, NOEC],
+            0x16: [self.func_with_mem(self.shift_left), ZEROPAGE_X, 2, 6, NOEC],
+            0x0e: [self.func_with_mem(self.shift_left), ABSOLUTE, 3, 6, NOEC],
+            0x1e: [self.func_with_mem(self.shift_left), ABSOLUTE_X, 3, 7, NOEC],
+
+            # ROL
+            0x2a: [self.func_with_acc(self.rotate_left), ACCUMULATOR, 1, 2, NOEC],
+            0x26: [self.func_with_mem(self.rotate_left), ZEROPAGE, 2, 5, NOEC],
+            0x36: [self.func_with_mem(self.rotate_left), ZEROPAGE_X, 2, 6, NOEC],
+            0x2e: [self.func_with_mem(self.rotate_left), ABSOLUTE, 3, 6, NOEC],
+            0x3e: [self.func_with_mem(self.rotate_left), ABSOLUTE_X, 3, 7, NOEC],
+
+            # ROR
+            0x6a: [self.func_with_acc(self.rotate_left), ACCUMULATOR, 1, 2, NOEC],
+            0x66: [self.func_with_mem(self.rotate_left), ZEROPAGE, 2, 5, NOEC],
+            0x76: [self.func_with_mem(self.rotate_left), ZEROPAGE_X, 2, 6, NOEC],
+            0x6e: [self.func_with_mem(self.rotate_left), ABSOLUTE, 3, 6, NOEC],
+            0x7e: [self.func_with_mem(self.rotate_left), ABSOLUTE_X, 3, 7, NOEC],
 
 
             ## LOADS
@@ -605,21 +625,55 @@ class Emu6502(threading.Thread):
                 extra_cycles = 2
         return extra_cycles
 
-    def shift_right_memory(self, addr):
+    def func_with_acc(self, func):
+        """
+        wrapper to run a function on the accumulator
+        """
+        def f():
+            self.regs[REG_A] = func(self.regs[REG_A])
+        return f
+    
+    def func_with_mem(self, func):
+        """
+        wrapper to run a function on the memory
+        """
+        def f(addr):
+            self.mem[addr] = func(self.mem[addr])
+        return f
+
+    def shift_right(self, val):
         # carry if lsb set
-        val = self.mem[addr]
         carry_on = (val & 0b00000001 != 0)
         val >>= 1
-        self.mem[addr] = val
         self.update_zn_flag(val)
         self.set_status_bit(STATUS_CARRY, carry_on)
+        return val
 
-    def shift_right_accumulator(self):
+    def shift_left(self, val):
         # carry if lsb set
-        carry_on = (self.regs[REG_A] & 0b00000001 != 0)
-        self.regs[REG_A] >>= 1
-        self.update_zn_flag(self.regs[REG_A])
+        carry_on = (val & 0b10000000 != 0)
+        val <<= 1
+        val &= 0b11111111 #truncate to 8 bits
+        self.update_zn_flag(val)
         self.set_status_bit(STATUS_CARRY, carry_on)
+        return val
+
+    def rotate_right(self, val):
+        carry = int((val & 0b00000001) != 0)
+        val >>= 1
+        val += carry << 7
+        self.update_zn_flag(val)
+        self.set_status_bit(STATUS_CARRY, bool(carry))
+        return val
+
+    def rotate_left(self, val):
+        carry = int((val & 0b10000000) != 0)
+        val <<= 1
+        val &= 0b11111111 #truncate to 8 bits
+        val += carry
+        self.update_zn_flag(val)
+        self.set_status_bit(STATUS_CARRY, bool(carry))
+        return val
 
     def hw_interrupt(self, maskable):
         """

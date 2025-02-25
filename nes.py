@@ -28,7 +28,9 @@ class RamDevice():
         self.mem[key] = val
 
 
-prg, chr = inesparser.parse_ines("rom/hello-world/build/starter.nes")
+# prg, chr = inesparser.parse_ines("rom/hello-world/build/starter.nes")
+prg, chr = inesparser.parse_ines("rom/donkeykong.nes")
+print(hex(len(prg)))
 
 dev = ppu.PpuApuIODevice(chr)
 rom = CartridgeRomDevice(prg)
@@ -37,7 +39,7 @@ ram = RamDevice()
 mmap = [
     (0x0000, ram), # volontarily make it shorter to test for mirrors
     (0x2000, dev),
-    (0X8000, rom),
+    (0Xc000, rom),
 ]
 
 # lst = lstdebug.LstDebugger("rom/hello-world/build/starter.lst")
