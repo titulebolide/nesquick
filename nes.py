@@ -51,4 +51,7 @@ dev.set_cpu_ram(ram)
 
 while True:
     emu.tick()
+    ## PPU runs at 3x PCU clock rate
+    dev.tick()
+    dev.tick()
     dev.tick()
