@@ -533,7 +533,9 @@ class Emu6502(threading.Thread):
         self.update_zn_flag(val)
         
     def cp(self, reg, val):
+        is_carry = (self.regs[reg] + byte_not(val)) > 255
         diff = self.regs[reg] - val
+        self.set_status_bit(STATUS_CARRY, is_carry)
         self.update_zn_flag(diff) #status_zero goes to 0 if equality
 
     def cpa(self, addr):
