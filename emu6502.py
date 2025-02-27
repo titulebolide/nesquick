@@ -56,6 +56,14 @@ def low_byte(val):
 def high_byte(val):
     return val // 256
 
+def bin8(val):
+    s = bin(val)[2:]
+    return '0b' + '0'*max(0, (8-len(s))) + s
+
+def hex2(val):
+    s = hex(val)[2:]
+    return '0x' + '0'*max(0,(2-len(s))) + s
+
 class Memory:
     def __init__(self, memory_map):
         """
@@ -441,7 +449,7 @@ class Emu6502(threading.Thread):
     
     def update_zn_flag(self, value):
         self.set_status_bit(STATUS_ZERO, value == 0)
-        self.set_status_bit(STATUS_NEG, value & 0b10000000 != 0)
+        self.set_status_bit(STATUS_NEG, (value & 0b10000000) != 0)
 
     def clear(self, status_bit):
         self.set_status_bit(status_bit, False)
@@ -659,20 +667,22 @@ class Emu6502(threading.Thread):
         return val
 
     def rotate_right(self, val):
-        carry = int((val & 0b00000001) != 0)
+        next_carry = self.get_status_bit(STATUS_CARRY)
+        next_carry = int((val & 0b00000001) != 0)
         val >>= 1
-        val += carry << 7
+        val += next_carry << 7
         self.update_zn_flag(val)
-        self.set_status_bit(STATUS_CARRY, bool(carry))
+        self.set_status_bit(STATUS_CARRY, bool(next_carry))
         return val
 
     def rotate_left(self, val):
-        carry = int((val & 0b10000000) != 0)
+        curr_carry = self.get_status_bit(STATUS_CARRY)
+        next_carry = int((val & 0b10000000) != 0)
         val <<= 1
         val &= 0b11111111 #truncate to 8 bits
-        val += carry
+        val += curr_carry
         self.update_zn_flag(val)
-        self.set_status_bit(STATUS_CARRY, bool(carry))
+        self.set_status_bit(STATUS_CARRY, bool(next_carry))
         return val
 
     def hw_interrupt(self, maskable):
@@ -736,15 +746,15 @@ class Emu6502(threading.Thread):
         if self.prgm_ctr is None:
             return
         print()
-        print("PC\tinst\tA\tX\tY\tS\tSP")
+        print("PC\tinst\tA\tX\tY\tSP\t  NV-BDIZC")
         print(
             hex(self.prgm_ctr),
-            hex(self.mem[self.prgm_ctr]),
-            hex(self.regs[REG_A]),
-            hex(self.regs[REG_X]),
-            hex(self.regs[REG_Y]),
-            bin(self.regs[REG_S]),
-            hex(self.stack_ptr),
+            hex2(self.mem[self.prgm_ctr]),
+            hex2(self.regs[REG_A]),
+            hex2(self.regs[REG_X]),
+            hex2(self.regs[REG_Y]),
+            hex2(self.stack_ptr),
+            bin8(self.regs[REG_S]),
             sep="\t"
         )
         # print("mem: ", *[dec2hex(i) for i in self.mem[0x00:0x10]])
