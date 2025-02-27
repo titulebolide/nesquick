@@ -759,7 +759,6 @@ class Emu6502(threading.Thread):
             bin8(self.regs[REG_S]),
             sep="\t"
         )
-        # print("mem: ", *[dec2hex(i) for i in self.mem[0x00:0x10]])
         if self.lst is not None:
             inst = self.lst.get_inst(self.prgm_ctr)
             print(inst)
@@ -781,7 +780,6 @@ class Emu6502(threading.Thread):
     def reset(self):
         reset_vector = 0xfffc
         self.prgm_ctr = (self.mem[reset_vector+1] << 8) + self.mem[reset_vector]
-        print(hex(self.prgm_ctr))
 
     def exec_inst(self):
         if self.debug:
