@@ -45,7 +45,7 @@ mmap = [
 ]
 
 # lst = lstdebug.LstDebugger("rom/hello-world/build/starter.lst")
-emu = emu6502.Emu6502(mmap, lst, debug=False)
+emu = emu6502.Emu6502(mmap, lst, False)
 
 
 dev.set_cpu_interrupt(emu.interrupt)

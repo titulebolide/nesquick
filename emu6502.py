@@ -1,4 +1,5 @@
 import threading
+import time
 
 REG_A = 0
 REG_X = 1
@@ -763,8 +764,7 @@ class Emu6502(threading.Thread):
             inst = self.lst.get_inst(self.prgm_ctr)
             print(inst)
             if "bkpt" in inst:
-                input()
-
+                time.sleep(2)
 
     def interrupt(self, maskable):
         """

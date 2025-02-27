@@ -26,6 +26,9 @@ PPUCTRL_BGPATTTABLE   = 0b00010000 # Pattern table no select in 8x8 mode
 PPUCTRL_OAMPATTTABLE  = 0b00001000 # Pattern table no select in 8x8 mode
 PPUCTRL_VRAMINC       = 0b00000100
 
+PPUOAM_ATT_HFLIP = 0b01000000
+PPUOAM_ATT_VFLIP = 0b10000000
+
 CONTROLLER_MAPPING = [112, 111, 98, 110, 119, 115, 97, 100] # A, B, Select, Start, Up, Down, Left, Right
 
 # TODO : set OAMADDR to 0 during sprite tile loading
@@ -171,7 +174,6 @@ class PpuApuIODevice:
                     }
                 )
 
-
 class PpuRenderer():
     def __init__(self, chr_rom, queue):
         self.queue = queue
@@ -202,12 +204,9 @@ class PpuRenderer():
             cv.waitKey(33)
 
     def render_nametable(self, frame, bg_table_no, nametable):
-        # nametable_no = ppuctrl & 0b11
-        # base_addr = 0x2000 + 0x400*nametable_no
         # x is left to right
         # y is up to down
         # but for imshow x is up to down, y is left to right
-        # table_no = get_ppuctrl_bit(PPUCTRL_BGPATTTABLE)
         for sprite_y in range(30):
             for sprite_x in range(32):
                 spriteno = nametable[sprite_x + sprite_y * 32]
@@ -218,9 +217,7 @@ class PpuRenderer():
         return frame
     
     def render_oam(self, frame, sprite_table_no, ppuoam, spritesize):
-        # if self.get_ppuctrl_bit(PPUCTRL_SPRITESIZE) == 0:
         if spritesize == 0:
-            # table_no = self.get_ppuctrl_bit(PPUCTRL_OAMPATTTABLE)
             for i in range(64):
                 oam_elt = ppuoam[i*4:i*4+4]
                 sprite_y = oam_elt[0] # top to bottom
@@ -228,11 +225,28 @@ class PpuRenderer():
                     continue
                 sprite_index = oam_elt[1]
                 sprite_attributes = oam_elt[2]
+                hflip = ((sprite_attributes & PPUOAM_ATT_HFLIP) != 0)
+                vflip = ((sprite_attributes & PPUOAM_ATT_VFLIP) != 0)
                 sprite_x = oam_elt[3] # left to right
                 sprite = inesparser.ines_get_sprite(self.chr_rom, sprite_index, sprite_table_no, False)
                 for x in range(8):
                     for y in range(8):
-                        frame[sprite_y + y, sprite_x + x] = sprite[y,x]
+                        pix_color = 0
+                        if not hflip and not vflip:
+                            pix_color = sprite[y,x]
+                        elif not vflip: # only hflip
+                            pix_color = sprite[y,7-x]
+                        elif not hflip: # only vflip
+                            pix_color = sprite[7-y,x]
+                        else: # vflip and hflip
+                            pix_color = sprite[7-y,7-x]
+                        if pix_color == 0:
+                            continue
+                        try:
+                            frame[sprite_y + y, sprite_x + x] = pix_color
+                        except IndexError:
+                            continue
+
         else:
             raise Exception("16x8 tiles not supported yet")
     
