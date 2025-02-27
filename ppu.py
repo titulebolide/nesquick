@@ -1,10 +1,11 @@
-import matplotlib.pyplot as plt
 import inesparser
 import numpy as np
 import threading
 import evdev
-
+import cv2 as cv
+import multiprocessing
 import random
+import time
 
 KEY_PPUCTRL = 0
 KEY_PPUMASK = 1
@@ -25,10 +26,12 @@ PPUCTRL_BGPATTTABLE   = 0b00010000 # Pattern table no select in 8x8 mode
 PPUCTRL_OAMPATTTABLE  = 0b00001000 # Pattern table no select in 8x8 mode
 PPUCTRL_VRAMINC       = 0b00000100
 
+CONTROLLER_MAPPING = [112, 111, 98, 110, 119, 115, 97, 100] # A, B, Select, Start, Up, Down, Left, Right
+
 # TODO : set OAMADDR to 0 during sprite tile loading
 
 class PpuApuIODevice:
-    def __init__(self, chr_rom):
+    def __init__(self, chr_rom, renderer_queue, kbval):
         self.cpu_interrupt = None
 
         self.chr_rom = chr_rom
@@ -44,11 +47,8 @@ class PpuApuIODevice:
         self.controller_strobe = 0
         self.controller_read_no = 0
 
-        self.keyboard = KbDevice()
-        self.keyboard.start()
-        self.prevval = 0
-
-        # self.stop = False
+        self.keyboard_val = kbval
+        self.renderer_queue = renderer_queue
 
     def set_cpu_interrupt(self, cpu_interrupt):
         self.cpu_interrupt = cpu_interrupt
@@ -75,15 +75,12 @@ class PpuApuIODevice:
         if key < 0x2000:
             key %= 8
         if key == KEY_PPUCTRL:
-            # print("PPUCTRL")
             self.ppuctrl = value
 
         elif key == KEY_PPUMASK:
             pass
-            # print("mask", bin(value))
 
         elif key == KEY_PPUADDR:
-            # print("PPUADDR")
             # done in two reads : msb, then lsb
             if self.ppu_reg_w == 1:
                 # we are reading the lsb
@@ -96,7 +93,6 @@ class PpuApuIODevice:
                 self.ppu_reg_w = 1
             
         elif key == KEY_PPUDATA:
-            # print("PPUDATA")
             self.vram[self.ppuaddr] = value
             self.inc_ppuaddr()
 
@@ -106,33 +102,22 @@ class PpuApuIODevice:
 
         elif key == KEY_OAMADDR:
             pass
-            # print("OAMADDR")
 
         elif key == KEY_OAMDATA:
             pass
-            # print("OAMDATA")
 
         elif key == KEY_OAMDMA:
             # todo : emulate cpu cycles for DMA ?
-            # print("OAMDMA")
             source_addr = (value << 8)
             self.ppuoam = self.cpu_ram[source_addr:source_addr + 256]
-            # print(self.ppuoam[0:4])
-            # self.stop = True
                 
         elif key == KEY_CTRL1:
             self.controller_strobe = (value & 1) # get lsb
             if self.controller_strobe == 1:
                 self.controller_read_no = 0
-            # print("CTRL1", bin(value))
 
         else:
             pass
-            # print("Unhandled dev reg", hex(key))
-
-        # if self.stop:
-        #     self.print_nametable()
-        #     # input()
 
 
     def __getitem__(self, key):
@@ -146,104 +131,119 @@ class PpuApuIODevice:
             return ret
 
         elif key == KEY_PPUSTATUS:
-            # print("PPUSTATUS")
+            # TODO : do better !!
             return int(random.random()*255.9999) # self.ppustatus
         
         elif key == KEY_CTRL1:
             # TODO : In the NES and Famicom, the top three (or five) bits are not driven, and so retain the bits of the previous byte on the bus. Usually this is the most significant byte of the address of the controller port—0x40. Certain games (such as Paperboy) rely on this behavior and require that reads from the controller ports return exactly $40 or $41 as appropriate. See: Controller reading: unconnected data lines.
-            # print("KEY_CTRL1")
             ret = 0
-            if self.controller_read_no == 0:
-                self.controller_strobe += 1
-            # if self.controller_strobe == 4:
-            #     ret = 1
-            elif self.controller_strobe > 8:
+            pressed_key = self.keyboard_val.value
+            
+            if self.controller_read_no > 7:
                 ret = 1
-            else:
-                ret = 0
-            # print(ret, self.controller_strobe)
+            elif pressed_key in CONTROLLER_MAPPING:
+                if self.controller_read_no == CONTROLLER_MAPPING.index(pressed_key):
+                    ret = 1
+
+            if self.controller_strobe == 0:
+                self.controller_read_no += 1
             return ret
 
         else:
             ret = 0 # TODO
-        # if key == 2:
-        #     # PPU STATUS
-        #     pass
-        #     # self.mem[key] = ret & 0b01111111 # clear vblank byte on read
-        # elif key == 4:
-        #     # OAMDATA
-        
-        # else:
-        #     pass
+
         return ret
     
     def tick(self):
         self.ntick += 1
-        # if self.ntick == 100:
-        #     self.ppustatus = 0b10000000
-            
         if self.ntick % 89342 == 89341:
             if self.get_ppuctrl_bit(PPUCTRL_VBLANKNMI) == 1:
-                frame1 = self.render_nametable()
-                frame = self.render_oam(frame1)
-
-                test = frame.sum() + sum(self.ppuoam)
-                if test != self.prevval:
-                    self.prevval = test
-                    plt.subplot(1, 3, 1)
-                    plt.imshow(self.render_nametable())
-                    plt.subplot(1, 3, 2)
-                    frame3 = self.render_oam(np.zeros((30*8, 32*8)))
-                    plt.imshow(frame3)
-                    plt.subplot(1, 3, 3)
-                    plt.imshow(frame)
-                    plt.show()
                 self.cpu_interrupt(maskable = False)
-                # print("Calling NMI")
+                nametable_no = self.ppuctrl & 0b11
+                nametable_base_addr = 0x2000 + 0x400*nametable_no
+                self.renderer_queue.put_nowait(
+                    {
+                        "bg_table_no":self.get_ppuctrl_bit(PPUCTRL_BGPATTTABLE),
+                        "nametable":self.vram[nametable_base_addr:nametable_base_addr+960],
+                        "sprite_table_no":self.get_ppuctrl_bit(PPUCTRL_OAMPATTTABLE),
+                        "ppuoam":self.ppuoam,
+                        "spritesize":self.get_ppuctrl_bit(PPUCTRL_SPRITESIZE),
+                    }
+                )
 
-    def render_nametable(self):
-        nametable_no = self.ppuctrl & 0b11
-        self.base_addr = 0x2000 + 0x400*nametable_no
-        frame = np.zeros((30*8, 32*8))
+
+class PpuRenderer():
+    def __init__(self, chr_rom, queue):
+        self.queue = queue
+        self.chr_rom = chr_rom
+
+    def run(self):
+        while True:
+            length = self.queue.qsize()
+            if length == 0:
+                time.sleep(0.001)
+                continue
+            ppu_state = None
+            for i in range(length):
+               ppu_state = self.queue.get()
+            frame = np.zeros((30*8, 32*8))
+            frame = self.render_nametable(
+                frame,
+                ppu_state["bg_table_no"],
+                ppu_state["nametable"],
+            )
+            self.render_oam(
+                frame,
+                ppu_state["sprite_table_no"],
+                ppu_state["ppuoam"],
+                ppu_state["spritesize"],
+            )
+            cv.imshow("frame", frame)
+            cv.waitKey(33)
+
+    def render_nametable(self, frame, bg_table_no, nametable):
+        # nametable_no = ppuctrl & 0b11
+        # base_addr = 0x2000 + 0x400*nametable_no
         # x is left to right
         # y is up to down
         # but for imshow x is up to down, y is left to right
-        table_no = self.get_ppuctrl_bit(PPUCTRL_BGPATTTABLE)
+        # table_no = get_ppuctrl_bit(PPUCTRL_BGPATTTABLE)
         for sprite_y in range(30):
             for sprite_x in range(32):
-                spriteno = self.vram[self.base_addr + sprite_x + sprite_y * 32]
+                spriteno = nametable[sprite_x + sprite_y * 32]
                 tile_x = sprite_y*8
                 tile_y = sprite_x*8
-                sprite = inesparser.ines_get_sprite(self.chr_rom, spriteno, table_no, False)
+                sprite = inesparser.ines_get_sprite(self.chr_rom, spriteno, bg_table_no, False)
                 frame[tile_x:tile_x+8, tile_y:tile_y+8] = sprite
         return frame
     
-    def render_oam(self, frame):
-        if self.get_ppuctrl_bit(PPUCTRL_SPRITESIZE) == 0:
-            table_no = self.get_ppuctrl_bit(PPUCTRL_OAMPATTTABLE)
+    def render_oam(self, frame, sprite_table_no, ppuoam, spritesize):
+        # if self.get_ppuctrl_bit(PPUCTRL_SPRITESIZE) == 0:
+        if spritesize == 0:
+            # table_no = self.get_ppuctrl_bit(PPUCTRL_OAMPATTTABLE)
             for i in range(64):
-                oam_elt = self.ppuoam[i*4:i*4+4]
+                oam_elt = ppuoam[i*4:i*4+4]
                 sprite_y = oam_elt[0] # top to bottom
                 if sprite_y == 255:
                     continue
                 sprite_index = oam_elt[1]
                 sprite_attributes = oam_elt[2]
                 sprite_x = oam_elt[3] # left to right
-                sprite = inesparser.ines_get_sprite(self.chr_rom, sprite_index, table_no, False)
-                frame[sprite_y:sprite_y+8, sprite_x:sprite_x+8] = sprite
+                sprite = inesparser.ines_get_sprite(self.chr_rom, sprite_index, sprite_table_no, False)
+                for x in range(8):
+                    for y in range(8):
+                        frame[sprite_y + y, sprite_x + x] = sprite[y,x]
         else:
             raise Exception("16x8 tiles not supported yet")
-
-        return frame
     
 
 class KbDevice(threading.Thread):
     def __init__(self):
         super().__init__()
-        self.asciival = 0
+        self.asciival = multiprocessing.Value("i", 0)
 
     def run(self):
-        dev = evdev.InputDevice('/dev/input/event4')
+        dev = evdev.InputDevice('/dev/input/event3')
         for event in dev.read_loop():
             if event.type != evdev.ecodes.EV_KEY:
                 continue
@@ -251,6 +251,6 @@ class KbDevice(threading.Thread):
             if len(key) != 1:
                 continue
             if event.value == 0: #press down
-                self.asciival = 0
+                self.asciival.value = 0
             elif event.value == 1:
-                self.asciival = ord(key.lower())
+                self.asciival.value = ord(key.lower())
