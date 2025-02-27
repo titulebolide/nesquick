@@ -28,8 +28,8 @@ class RamDevice():
         self.mem[key] = val
 
 
-# prg, chr = inesparser.parse_ines("rom/hello-world/build/starter.nes")
-prg, chr = inesparser.parse_ines("rom/donkeykong.nes")
+prg, chr = inesparser.parse_ines("rom/Donkey-Kong-NES-Disassembly/dk.nes")
+lst = lstdebug.LstDebuggerAsm6("rom/Donkey-Kong-NES-Disassembly/dk.lst")
 print(hex(len(prg)))
 
 dev = ppu.PpuApuIODevice(chr)
@@ -44,7 +44,7 @@ mmap = [
 
 # lst = lstdebug.LstDebugger("rom/hello-world/build/starter.lst")
 
-emu = emu6502.Emu6502(mmap, debug=True)
+emu = emu6502.Emu6502(mmap, lst, debug=False)
 
 dev.set_cpu_interrupt(emu.interrupt)
 dev.set_cpu_ram(ram)
