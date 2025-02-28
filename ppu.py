@@ -35,9 +35,13 @@ CONTROLLER_MAPPING = [112, 111, 98, 110, 119, 115, 97, 100] # A, B, Select, Star
 
 class PpuApuIODevice:
     def __init__(self, chr_rom, renderer_queue, kbval):
-        self.cpu_interrupt = None
-
         self.chr_rom = chr_rom
+        self.keyboard_val = kbval
+        self.renderer_queue = renderer_queue
+        
+        self.cpu_interrupt = None
+        self.cpu_ram = None
+        
         self.vram = [0]*0x4000 # 14 bit addr space
         self.ntick = 0
         self.ppu_reg_w = 0
@@ -50,8 +54,6 @@ class PpuApuIODevice:
         self.controller_strobe = 0
         self.controller_read_no = 0
 
-        self.keyboard_val = kbval
-        self.renderer_queue = renderer_queue
 
     def set_cpu_interrupt(self, cpu_interrupt):
         self.cpu_interrupt = cpu_interrupt
