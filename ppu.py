@@ -257,10 +257,17 @@ class KbDevice(threading.Thread):
     def __init__(self):
         super().__init__()
         self.asciival = multiprocessing.Value("i", 0)
+        self.done = False
+
+    def stop(self):
+        self.done = True
 
     def run(self):
+        self.done = False
         dev = evdev.InputDevice('/dev/input/event3')
         for event in dev.read_loop():
+            if self.done:
+                break
             if event.type != evdev.ecodes.EV_KEY:
                 continue
             key = evdev.ecodes.KEY[event.code][4:]
