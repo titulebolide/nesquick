@@ -120,7 +120,7 @@ class Emu6502(threading.Thread):
 
         self.mem = Memory(memory_map)
 
-        self.instuction_cycle = 0
+        self.instruction_cycle = 0
         self.instruction_nbcycles = 0
 
         # operation, nbytes, ncycles, extracycles
@@ -829,13 +829,13 @@ class Emu6502(threading.Thread):
     def tick(self):
         # run instruction if we are at the beggining of the cycle
         # else just register the tick
-        if self.instuction_cycle == 0:
+        if self.instruction_cycle == 0:
             self.instruction_nbcycles = self.exec_inst()
             if self.instruction_nbcycles == -1:
                 return False
-        self.instuction_cycle += 1
-        if self.instuction_cycle == self.instruction_nbcycles:
-            self.instuction_cycle = 0
+        self.instruction_cycle += 1
+        if self.instruction_cycle == self.instruction_nbcycles:
+            self.instruction_cycle = 0
         return True
 
     def run(self):
