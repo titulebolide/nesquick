@@ -748,23 +748,29 @@ class Emu6502(threading.Thread):
     def dbg(self):
         if self.prgm_ctr is None:
             return
-        print()
-        print("PC\tinst\tA\tX\tY\tSP\t  NV-BDIZC")
-        print(
-            hex(self.prgm_ctr),
-            hex2(self.mem[self.prgm_ctr]),
-            hex2(self.regs[REG_A]),
-            hex2(self.regs[REG_X]),
-            hex2(self.regs[REG_Y]),
-            hex2(self.stack_ptr),
-            bin8(self.regs[REG_S]),
-            sep="\t"
-        )
+        inst = ""
         if self.lst is not None:
             inst = self.lst.get_inst(self.prgm_ctr)
-            print(inst)
-            if "bkpt" in inst:
-                time.sleep(2)
+        print(
+            "\n",
+            "PC\tinst\tA\tX\tY\tSP\t  NV-BDIZC",
+            "\n",
+            "\t".join((
+                hex(self.prgm_ctr),
+                hex2(self.mem[self.prgm_ctr]),
+                hex2(self.regs[REG_A]),
+                hex2(self.regs[REG_X]),
+                hex2(self.regs[REG_Y]),
+                hex2(self.stack_ptr),
+                bin8(self.regs[REG_S]),
+            )),
+            "\n",
+            inst,
+            sep = "",
+        )
+        if "bkpt" in inst:
+            time.sleep(2)
+
 
     def interrupt(self, maskable):
         """
