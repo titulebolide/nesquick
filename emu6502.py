@@ -517,7 +517,6 @@ class Emu6502(threading.Thread):
     def store(self, reg, addr):
         val = self.regs[reg]
         self.mem[addr] = val
-        self.update_zn_flag(val)
 
     def sta(self, addr):
         return self.store(REG_A, addr)   
