@@ -7,6 +7,8 @@ import multiprocessing
 import random
 import time
 
+from palette import palette as nespalette
+
 KEY_PPUCTRL = 0
 KEY_PPUMASK = 1
 KEY_PPUSTATUS = 2
@@ -169,12 +171,14 @@ class PpuApuIODevice:
                 self.renderer_queue.put_nowait(
                     {
                         "bg_table_no":self.get_ppuctrl_bit(PPUCTRL_BGPATTTABLE),
-                        "nametable":self.vram[nametable_base_addr:nametable_base_addr+960],
+                        "nametable":self.vram[nametable_base_addr:nametable_base_addr+0x400],
                         "sprite_table_no":self.get_ppuctrl_bit(PPUCTRL_OAMPATTTABLE),
                         "ppuoam":self.ppuoam,
                         "spritesize":self.get_ppuctrl_bit(PPUCTRL_SPRITESIZE),
+                        "palettes":self.vram[0x3f00:0x3f20]
                     }
                 )
+
 
 class PpuRenderer():
     def __init__(self, chr_rom, queue):
@@ -190,68 +194,95 @@ class PpuRenderer():
             ppu_state = None
             for i in range(length):
                ppu_state = self.queue.get()
-            frame = np.zeros((30*8, 32*8))
-            frame = self.render_nametable(
+            frame = np.zeros((30*8, 32*8, 3), dtype=np.uint8)
+            self.render_nametable(
                 frame,
                 ppu_state["bg_table_no"],
                 ppu_state["nametable"],
+                ppu_state["palettes"],
             )
             self.render_oam(
                 frame,
                 ppu_state["sprite_table_no"],
                 ppu_state["ppuoam"],
                 ppu_state["spritesize"],
+                ppu_state["palettes"],
             )
-            cv.imshow("frame", frame)
+            image_bgr = cv.cvtColor(frame, cv.COLOR_RGB2BGR)
+            cv.imshow("frame", image_bgr)
             cv.waitKey(33)
 
-    def render_nametable(self, frame, bg_table_no, nametable):
+    def render_nametable(self, frame, bg_table_no, nametable, palettes):
         # x is left to right
         # y is up to down
         # but for imshow x is up to down, y is left to right
         for sprite_y in range(30):
             for sprite_x in range(32):
-                spriteno = nametable[sprite_x + sprite_y * 32]
-                tile_x = sprite_y*8
-                tile_y = sprite_x*8
-                sprite = inesparser.ines_get_sprite(self.chr_rom, spriteno, bg_table_no, False)
-                frame[tile_x:tile_x+8, tile_y:tile_y+8] = sprite
-        return frame
-    
-    def render_oam(self, frame, sprite_table_no, ppuoam, spritesize):
+                sprite_no = nametable[sprite_x + sprite_y * 32]
+
+                attribute_table_addr = 0x3c0 +  (sprite_x // 4)*8 + sprite_y // 4
+                print(attribute_table_addr)
+                """
+                7654 3210
+                |||| ||++- Color bits 3-2 for top left quadrant of this byte
+                |||| ++--- Color bits 3-2 for top right quadrant of this byte
+                ||++------ Color bits 3-2 for bottom left quadrant of this byte
+                ++-------- Color bits 3-2 for bottom right quadrant of this byte
+                """
+                attr_bitshift = 0
+                if sprite_y % 4 > 1:
+                    # bottom
+                    attr_bitshift += 4
+                if sprite_x % 4 > 1:
+                    # right
+                    attr_bitshift += 2
+                palette_no = ((nametable[attribute_table_addr] << attr_bitshift) & 0b11)
+
+                self.add_sprite(sprite_no, bg_table_no, frame, sprite_x*8, sprite_y*8, palette_no, palettes, False, False)
+
+
+    def render_oam(self, frame, sprite_table_no, ppuoam, spritesize, palettes):
         if spritesize == 0:
             for i in range(64):
                 oam_elt = ppuoam[i*4:i*4+4]
                 sprite_y = oam_elt[0] # top to bottom
                 if sprite_y == 255:
                     continue
-                sprite_index = oam_elt[1]
+                sprite_no = oam_elt[1]
                 sprite_attributes = oam_elt[2]
                 hflip = ((sprite_attributes & PPUOAM_ATT_HFLIP) != 0)
                 vflip = ((sprite_attributes & PPUOAM_ATT_VFLIP) != 0)
+                palette_no = (sprite_attributes & 0b11) + 4 # add 4 to reach OAM palette
                 sprite_x = oam_elt[3] # left to right
-                sprite = inesparser.ines_get_sprite(self.chr_rom, sprite_index, sprite_table_no, False)
-                for x in range(8):
-                    for y in range(8):
-                        pix_color = 0
-                        if not hflip and not vflip:
-                            pix_color = sprite[y,x]
-                        elif not vflip: # only hflip
-                            pix_color = sprite[y,7-x]
-                        elif not hflip: # only vflip
-                            pix_color = sprite[7-y,x]
-                        else: # vflip and hflip
-                            pix_color = sprite[7-y,7-x]
-                        if pix_color == 0:
-                            continue
-                        try:
-                            frame[sprite_y + y, sprite_x + x] = pix_color
-                        except IndexError:
-                            continue
+                
+                self.add_sprite(sprite_no, sprite_table_no, frame, sprite_x, sprite_y, palette_no, palettes, hflip, vflip)
 
         else:
             raise Exception("16x8 tiles not supported yet")
-    
+
+    def add_sprite(self, sprite_no, sprite_table_no, frame, spritex, spritey, palette_no, palettes, hflip, vflip):
+        palette = palettes[palette_no*4:palette_no*4 + 4]
+        sprite = inesparser.ines_get_sprite(self.chr_rom, sprite_no, sprite_table_no, False)
+
+        for x in range(8):
+            for y in range(8):
+                pix_color = 0
+                if not hflip and not vflip:
+                    pix_color = sprite[y,x]
+                elif not vflip: # only hflip
+                    pix_color = sprite[y,7-x]
+                elif not hflip: # only vflip
+                    pix_color = sprite[7-y,x]
+                else: # vflip and hflip
+                    pix_color = sprite[7-y,7-x]
+                if pix_color == 0:
+                    continue
+                try:
+                    r,g,b =  nespalette[palette[pix_color]]
+                    frame[spritey + y, spritex + x] = [r,g,b]
+                except IndexError:
+                    continue
+
 
 class KbDevice(threading.Thread):
     def __init__(self):
