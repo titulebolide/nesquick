@@ -54,7 +54,7 @@ keyboard = ppu.KbDevice()
 render_queue = multiprocessing.Queue()
 renderer = ppu.PpuRenderer(chr, render_queue)
 
-dev = ppu.PpuApuIODevice(chr, render_queue, keyboard.asciival)
+dev = ppu.PpuApuIODevice(chr, render_queue, keyboard.state)
 rom = CartridgeRomDevice(prg)
 ram = RamDevice()
 

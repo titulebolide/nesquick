@@ -31,14 +31,14 @@ PPUCTRL_VRAMINC       = 0b00000100
 PPUOAM_ATT_HFLIP = 0b01000000
 PPUOAM_ATT_VFLIP = 0b10000000
 
-CONTROLLER_MAPPING = [112, 111, 98, 110, 119, 115, 97, 100] # A, B, Select, Start, Up, Down, Left, Right
+CONTROLLER_MAPPING = ["p", "o", "b", "n", "w", "s", "a", "d"] # A, B, Select, Start, Up, Down, Left, Right
 
 # TODO : set OAMADDR to 0 during sprite tile loading
 
 class PpuApuIODevice:
-    def __init__(self, chr_rom, renderer_queue, kbval):
+    def __init__(self, chr_rom, renderer_queue, kbstate):
         self.chr_rom = chr_rom
-        self.keyboard_val = kbval
+        self.keyboard_state = kbstate
         self.renderer_queue = renderer_queue
 
         self.cpu_interrupt = None
@@ -144,13 +144,12 @@ class PpuApuIODevice:
         elif key == KEY_CTRL1:
             # TODO : In the NES and Famicom, the top three (or five) bits are not driven, and so retain the bits of the previous byte on the bus. Usually this is the most significant byte of the address of the controller port—0x40. Certain games (such as Paperboy) rely on this behavior and require that reads from the controller ports return exactly $40 or $41 as appropriate. See: Controller reading: unconnected data lines.
             ret = 0
-            pressed_key = self.keyboard_val.value
+            controller_state = self.keyboard_state.value
 
             if self.controller_read_no > 7:
                 ret = 1
-            elif pressed_key in CONTROLLER_MAPPING:
-                if self.controller_read_no == CONTROLLER_MAPPING.index(pressed_key):
-                    ret = 1
+            else:
+                ret = ((controller_state >> self.controller_read_no) & 1)
 
             if self.controller_strobe == 0:
                 self.controller_read_no += 1
@@ -277,15 +276,23 @@ class PpuRenderer():
                     continue
                 try:
                     r,g,b =  nespalette[palette[pix_color]]
-                    frame[spritey + y, spritex + x] = [b,g,r]
+                    frame[spritey + y, spritex + x] = [b,g,r] # opencv display bgr
                 except IndexError:
                     continue
 
+def turn_bit_on(val, bit_no):
+    val |= (1 << bit_no)
+    return val
+
+def turn_bit_off(val, bit_no):
+    val = turn_bit_on(val, bit_no) # to make sure the bit is on
+    val -= (1 << bit_no) # remove the bit by substracting the val
+    return val
 
 class KbDevice(threading.Thread):
     def __init__(self):
         super().__init__()
-        self.asciival = multiprocessing.Value("i", 0)
+        self.state = multiprocessing.Value("i", 0)
         self.done = False
 
     def stop(self):
@@ -299,10 +306,16 @@ class KbDevice(threading.Thread):
                 break
             if event.type != evdev.ecodes.EV_KEY:
                 continue
-            key = evdev.ecodes.KEY[event.code][4:]
+            key = evdev.ecodes.KEY[event.code][4:].lower()
             if len(key) != 1:
                 continue
-            if event.value == 0: #press down
-                self.asciival.value = 0
-            elif event.value == 1:
-                self.asciival.value = ord(key.lower())
+            if key not in CONTROLLER_MAPPING: # not an interesting key
+                continue
+            if event.value not in (0,1): # press down or up
+                continue
+            key_bit_no = CONTROLLER_MAPPING.index(key)
+            if event.value == 0:
+                self.state.value = turn_bit_off(self.state.value, key_bit_no)
+            else:
+                self.state.value = turn_bit_on(self.state.value, key_bit_no)
+
