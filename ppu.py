@@ -40,10 +40,10 @@ class PpuApuIODevice:
         self.chr_rom = chr_rom
         self.keyboard_val = kbval
         self.renderer_queue = renderer_queue
-        
+
         self.cpu_interrupt = None
         self.cpu_ram = None
-        
+
         self.vram = [0]*0x4000 # 14 bit addr space
         self.ntick = 0
         self.ppu_reg_w = 0
@@ -71,7 +71,7 @@ class PpuApuIODevice:
         if self.ppuctrl & status_bit != 0:
             return 1
         return 0
-    
+
     def inc_ppuaddr(self):
         if self.get_ppuctrl_bit(PPUCTRL_VRAMINC) == 1:
             self.ppuaddr += 32
@@ -98,7 +98,7 @@ class PpuApuIODevice:
                 # msb, null the most signifants two bits (14 bit long addr space)
                 self.ppuaddr = value & 0b00111111
                 self.ppu_reg_w = 1
-            
+
         elif key == KEY_PPUDATA:
             self.vram[self.ppuaddr] = value
             self.inc_ppuaddr()
@@ -117,7 +117,7 @@ class PpuApuIODevice:
             # todo : emulate cpu cycles for DMA ?
             source_addr = (value << 8)
             self.ppuoam = self.cpu_ram[source_addr:source_addr + 256]
-                
+
         elif key == KEY_CTRL1:
             self.controller_strobe = (value & 1) # get lsb
             if self.controller_strobe == 1:
@@ -145,7 +145,7 @@ class PpuApuIODevice:
             # TODO : In the NES and Famicom, the top three (or five) bits are not driven, and so retain the bits of the previous byte on the bus. Usually this is the most significant byte of the address of the controller port—0x40. Certain games (such as Paperboy) rely on this behavior and require that reads from the controller ports return exactly $40 or $41 as appropriate. See: Controller reading: unconnected data lines.
             ret = 0
             pressed_key = self.keyboard_val.value
-            
+
             if self.controller_read_no > 7:
                 ret = 1
             elif pressed_key in CONTROLLER_MAPPING:
@@ -160,7 +160,8 @@ class PpuApuIODevice:
             ret = 0 # TODO
 
         return ret
-    
+
+
     def tick(self):
         self.ntick += 1
         if self.ntick % 89342 == 89341:
@@ -208,8 +209,7 @@ class PpuRenderer():
                 ppu_state["spritesize"],
                 ppu_state["palettes"],
             )
-            image_bgr = cv.cvtColor(frame, cv.COLOR_RGB2BGR)
-            cv.imshow("frame", image_bgr)
+            cv.imshow("frame", frame)
             cv.waitKey(33)
 
     def render_nametable(self, frame, bg_table_no, nametable, palettes):
@@ -220,8 +220,7 @@ class PpuRenderer():
             for sprite_x in range(32):
                 sprite_no = nametable[sprite_x + sprite_y * 32]
 
-                attribute_table_addr = 0x3c0 +  (sprite_x // 4)*8 + sprite_y // 4
-                print(attribute_table_addr)
+                attribute_table_addr = 0x3c0 +  (sprite_y // 4)*8 + sprite_x // 4
                 """
                 7654 3210
                 |||| ||++- Color bits 3-2 for top left quadrant of this byte
@@ -236,7 +235,7 @@ class PpuRenderer():
                 if sprite_x % 4 > 1:
                     # right
                     attr_bitshift += 2
-                palette_no = ((nametable[attribute_table_addr] << attr_bitshift) & 0b11)
+                palette_no = ((nametable[attribute_table_addr] >> attr_bitshift) & 0b11)
 
                 self.add_sprite(sprite_no, bg_table_no, frame, sprite_x*8, sprite_y*8, palette_no, palettes, False, False)
 
@@ -254,7 +253,6 @@ class PpuRenderer():
                 vflip = ((sprite_attributes & PPUOAM_ATT_VFLIP) != 0)
                 palette_no = (sprite_attributes & 0b11) + 4 # add 4 to reach OAM palette
                 sprite_x = oam_elt[3] # left to right
-                
                 self.add_sprite(sprite_no, sprite_table_no, frame, sprite_x, sprite_y, palette_no, palettes, hflip, vflip)
 
         else:
@@ -279,7 +277,7 @@ class PpuRenderer():
                     continue
                 try:
                     r,g,b =  nespalette[palette[pix_color]]
-                    frame[spritey + y, spritex + x] = [r,g,b]
+                    frame[spritey + y, spritex + x] = [b,g,r]
                 except IndexError:
                     continue
 
