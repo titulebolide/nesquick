@@ -50,7 +50,7 @@ def ines_get_sprite(chr, tile_index, table_no, doubletile=False):
     """
     doubletile : 16x8 tile mode
     """
-    sprite = np.zeros((8,8))
+    sprite = np.zeros((8,8), dtype=np.uint8)
     plane0_addr = (tile_index + 256*table_no) << 4
     plane0 = chr[plane0_addr:plane0_addr+8]
     plane1 = chr[plane0_addr+8:plane0_addr+16]
@@ -61,8 +61,6 @@ def ines_get_sprite(chr, tile_index, table_no, doubletile=False):
             color = (color1 << 1) + color0
             
             # increase color value to separate from the bg
-            if color != 0:
-                color += 4
             # if transparent (color 0, change to 1 every two to have a checkerboard)
             # elif (tile_y + tile_x) %2 == 0 :
             #     color = 1 
