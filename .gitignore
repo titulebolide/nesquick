@@ -4,3 +4,6 @@
 *.asm
 *.lst
 __pycache__/
+build/
+.vscode/
+test/
