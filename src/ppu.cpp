@@ -26,7 +26,7 @@ void PpuDevice::set_cpu(Emu6502 *_cpu) {
 }
 
 bool PpuDevice::get_ppuctrl_bit(uint8_t status_bit) {
-    return (ppuctrl & status_bit != 0);
+    return ((ppuctrl & status_bit) != 0);
 }
 
 void PpuDevice::inc_ppuaddr() {

@@ -14,8 +14,11 @@ int main() {
     uint8_t chr[0x4000] = {0}; // TODO : check sizes
 
     parseInes("../rom/Donkey-Kong-NES-Disassembly/dk.nes", prg, chr);
-
     LstDebuggerAsm6 lst("../rom/Donkey-Kong-NES-Disassembly/dk.lst", true);
+
+    // parseInes("../rom/hello-world/build/starter.nes", prg, chr);
+    // LstDebuggerAsm6 lst("../rom/hello-world/build/starter.lst", false);
+
 
     CartridgeRomDevice rom(prg);
     RamDevice ram;
@@ -27,7 +30,7 @@ int main() {
         {0xc000, &rom},
     });
 
-    Emu6502 cpu(&mem, true, &lst);
+    Emu6502 cpu(&mem, false, &lst);
     ppu.set_cpu(&cpu); // urgh
 
 

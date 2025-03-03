@@ -21,14 +21,14 @@ enum {
 };
 
 
-static const uint16_t PPUCTRL_VBLANKNMI     = 0b10000000; // 0 : disable NMI on vblank
-static const uint16_t PPUCTRL_SPRITESIZE    = 0b00100000; // 0 : 8x8, 1: 8x16
-static const uint16_t PPUCTRL_BGPATTTABLE   = 0b00010000; // Pattern table no select in 8x8 mode
-static const uint16_t PPUCTRL_OAMPATTTABLE  = 0b00001000; // Pattern table no select in 8x8 mode
-static const uint16_t PPUCTRL_VRAMINC       = 0b00000100;
+static const uint8_t PPUCTRL_VBLANKNMI     = 0b10000000; // 0 : disable NMI on vblank
+static const uint8_t PPUCTRL_SPRITESIZE    = 0b00100000; // 0 : 8x8, 1: 8x16
+static const uint8_t PPUCTRL_BGPATTTABLE   = 0b00010000; // Pattern table no select in 8x8 mode
+static const uint8_t PPUCTRL_OAMPATTTABLE  = 0b00001000; // Pattern table no select in 8x8 mode
+static const uint8_t PPUCTRL_VRAMINC       = 0b00000100;
 
-static const uint16_t PPUOAM_ATT_HFLIP = 0b01000000;
-static const uint16_t PPUOAM_ATT_VFLIP = 0b10000000;
+static const uint8_t PPUOAM_ATT_HFLIP = 0b01000000;
+static const uint8_t PPUOAM_ATT_VFLIP = 0b10000000;
 
 class PpuDevice : public Device {
 private:
