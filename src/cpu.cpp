@@ -62,6 +62,7 @@ uint16_t Emu6502::get_addr(int mode, bool * page_crossed) {
         }
         uint8_t new_page_no = high_byte(addr);
         *page_crossed = (new_page_no != base_page_no);
+
     } else if (mode == ZEROPAGE || mode == ZEROPAGE_X || mode == ZEROPAGE_Y) {
         addr = mem->get(prgm_ctr + 1);
         if (mode == ZEROPAGE_X) {
@@ -71,16 +72,19 @@ uint16_t Emu6502::get_addr(int mode, bool * page_crossed) {
             addr += regs[REG_Y];
             addr &= 0xff;
         }
+
     } else if (mode == INDIRECT) {
         uint16_t implicit_addr = get_addr(ABSOLUTE, &dummy_bool);
         uint8_t dest_addr_lsb = mem->get(implicit_addr);
         uint8_t dest_addr_msb = mem->get((implicit_addr + 1) & 0xffff);
         addr = dest_addr_lsb + (dest_addr_msb << 8);
+
     } else if (mode == PRE_INDEX_INDIRECT) {
         uint16_t implicit_addr = get_addr(ZEROPAGE_X, &dummy_bool);
         uint8_t dest_addr_lsb = mem->get(implicit_addr);
         uint8_t dest_addr_msb = mem->get((implicit_addr + 1) & 0xffff);
         addr = dest_addr_lsb + (dest_addr_msb << 8);
+
     } else if (mode == POST_INDEX_INDIRECT) {
         uint16_t implicit_addr = get_addr(ZEROPAGE, &dummy_bool);
         uint8_t dest_addr_lsb = mem->get(implicit_addr);
@@ -91,8 +95,10 @@ uint16_t Emu6502::get_addr(int mode, bool * page_crossed) {
         addr &= 0xffff;
         uint8_t new_page_no = high_byte(addr);
         *page_crossed = (new_page_no != base_page_no);
+
     } else if (mode == IMMEDIATE) {
-        return prgm_ctr + 1, false;
+        *page_crossed = false;
+        addr = prgm_ctr + 1;
     } else {
         throw std::runtime_error("Invalid addressing mode");
     }
@@ -396,18 +402,19 @@ void Emu6502::op_rti() {
 
 void Emu6502::dbg() {
     if (prgm_ctr == 0) {
-        std::cout << "prout" << std::endl;
         return;
     }
-    std::string inst = "zob";
+    std::string inst = "";
     if (lst != nullptr) {
         inst = lst->getInst(prgm_ctr);
     }
     std::cout << "\nPC\tinst\tA\tX\tY\tSP\tNV-BDIZC\n";
     std::cout << std::hex << prgm_ctr << "\t" << hex2(mem->get(prgm_ctr)) << "\t" << hex2(regs[REG_A]) << "\t" << hex2(regs[REG_X]) << "\t" << hex2(regs[REG_Y]) << "\t" << hex2(stack_ptr) << "\t" << bin8(regs[REG_S]) << "\n";
+    std::cout << inst << std::endl;
     if (inst.find("bkpt") != std::string::npos) {
         std::this_thread::sleep_for(std::chrono::seconds(2));
     }
+    // std::this_thread::sleep_for(std::chrono::milliseconds(10));
 }
 
 void Emu6502::interrupt(bool maskable) {
@@ -467,7 +474,7 @@ int Emu6502::exec_inst() {
 
     if (!(op.addr_mode == IMPLICIT || op.addr_mode == ACCUMULATOR || op.addr_mode == BRANCHEC)) {
         bool page_crossed;
-        uint16_t addr = get_addr(op.addr_mode, &page_crossed);
+        op_addr = get_addr(op.addr_mode, &page_crossed);
         if (page_crossed) {
             op_extra_cycles = 1;
         }

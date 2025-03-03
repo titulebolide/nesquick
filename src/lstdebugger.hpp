@@ -10,7 +10,7 @@
 
 class LstDebuggerAsm6 {
 public:
-    LstDebuggerAsm6(const std::string& lstfile);
+    LstDebuggerAsm6(const std::string& lstfile, bool asm6);
 
     std::string getInst(uint16_t addr) const;
 

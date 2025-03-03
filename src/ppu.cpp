@@ -163,3 +163,125 @@ void PpuDevice::tick() {
             //     }
             // )
 }
+
+
+void PpuDevice::render_nametable(cv::Mat * frame) { //(self, frame, bg_table_no, nametable, palettes):
+    // # x is left to right
+    // # y is up to down
+    // # but for imshow x is up to down, y is left to right
+    for (int16_t sprite_y = 0; sprite_y < 30; sprite_y++) {
+        for (int16_t sprite_x = 0; sprite_x < 32; sprite_x++) {
+            uint16_t nametable_no = ppuctrl & 0b11;
+            uint16_t nametable_base_addr = 0x2000 + 0x400*nametable_no;
+            uint8_t sprite_no = vram[nametable_base_addr + sprite_x + sprite_y * 32];
+            uint16_t attribute_table_addr = 0x3c0 +  (sprite_y / 4)*8 + sprite_x / 4;
+            /*
+            7654 3210
+            |||| ||++- Color bits 3-2 for top left quadrant of this byte
+            |||| ++--- Color bits 3-2 for top right quadrant of this byte
+            ||++------ Color bits 3-2 for bottom left quadrant of this byte
+            ++-------- Color bits 3-2 for bottom right quadrant of this byte
+            */
+            uint8_t attr_bitshift = 0;
+            if (sprite_y % 4 > 1) {
+                // bottom
+                attr_bitshift += 4;
+            }
+            if (sprite_x % 4 > 1) {
+                // right
+                attr_bitshift += 2;
+            }
+            uint8_t palette_no = ((vram[nametable_base_addr + attribute_table_addr] >> attr_bitshift) & 0b11);
+            bool table_no = get_ppuctrl_bit(PPUCTRL_BGPATTTABLE);
+            add_sprite(frame, sprite_no, table_no, sprite_x*8, sprite_y*8, palette_no, false, false);
+        }
+    }
+}
+
+void PpuDevice::render_oam(cv::Mat * frame) { //self, frame, sprite_table_no, ppuoam, spritesize, palettes):
+    
+    bool spritesize = get_ppuctrl_bit(PPUCTRL_SPRITESIZE);
+
+    if (!spritesize) {
+
+        for (int8_t i = 0; i < 64; i++) {
+            uint8_t sprite_y = ppuoam[i*4]; // top to bottom
+            uint8_t sprite_no = ppuoam[i*4+1];
+            uint8_t sprite_attr = ppuoam[i*4+2];
+            uint8_t sprite_x = ppuoam[i*4+3]; // left to right
+            if (sprite_y == 255) {
+                // TODO : I guess this should be handled differently!
+                continue;
+            }
+            bool hflip = ((sprite_attr & PPUOAM_ATT_HFLIP) != 0);
+            bool vflip = ((sprite_attr & PPUOAM_ATT_VFLIP) != 0);
+            uint8_t palette_no = (sprite_attr & 0b11) + 4; // add 4 to reach OAM palette
+            bool table_no = get_ppuctrl_bit(PPUCTRL_OAMPATTTABLE);
+            add_sprite(frame, sprite_no, table_no, sprite_x, sprite_y, palette_no, hflip, vflip);
+        }
+    } else {
+        throw std::runtime_error("16x8 tiles not supported yet");
+    }
+}
+
+void PpuDevice::add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, uint8_t sprite_x, uint8_t sprite_y, uint8_t palette_no, bool hflip, bool vflip) { //(self, sprite_no, sprite_table_no, frame, spritex, spritey, palette_no, palettes, hflip, vflip):
+    // palette = palettes[palette_no*4:palette_no*4 + 4]
+    uint8_t sprite[8][8];
+    get_sprite(sprite, sprite_no, table_no, false);
+
+    for (uint8_t x = 0; x < 8; x++) {
+        for (uint8_t y = 0; y < 8; y++) {
+            uint8_t pix_color = 0;
+            if (!hflip && !vflip) {
+                pix_color = sprite[y][x];
+            } else if (!vflip) { // only hflip
+                pix_color = sprite[y][7-x];
+            } else if (!hflip) { // only vflip
+                pix_color = sprite[7-y][x];
+            } else { // vflip and hflip
+                pix_color = sprite[7-y][7-x];
+            }
+            if (pix_color == 0) {
+                continue;
+            }
+            // r,g,b =  nespalette[palette[pix_color]]
+            uint8_t r = 255;
+            uint8_t g = 0;
+            uint8_t b = 255;
+            // TODO there are fatser ways to populate a frame
+            frame->at<uint8_t>(sprite_y + y, sprite_x + x, 0) = b;
+            // frame->at<uint8_t>(sprite_y + y, sprite_x + x, 1) = g;
+            // frame->at<uint8_t>(sprite_y + y, sprite_x + x, 2) = r;
+        }
+    }
+}
+
+void PpuDevice::get_sprite(uint8_t sprite[8][8], uint8_t sprite_no, bool table_no, bool doubletile) {
+    /*
+    sprite is a uint8_t[8][8];
+    doubletile : 16x8 tile mode
+    */
+    if (doubletile) {
+        throw std::runtime_error("doubletile not implemented yet");
+    }
+
+    uint16_t plane0_addr = (sprite_no + 256*table_no) << 4;
+    for (uint8_t j = 0; j < 8; j++) {
+        uint8_t plane0 = chr_rom[plane0_addr + j];
+        uint8_t plane1 = chr_rom[plane0_addr + j];
+        for (uint8_t i = 0; i < 8; i++) {
+            uint8_t color0 = (plane0 >> i) & 1;
+            uint8_t color1 = (plane1 >> i) & 1;
+            uint8_t color = (color1 << 1) + color0;
+            sprite[j][7-i] = color;
+        }
+    }
+}
+
+void PpuDevice::render() {
+    cv::Mat frame(30*8, 32*8, CV_8UC3);
+    render_nametable(&frame);
+    render_oam(&frame);
+    cv::imshow("prout", frame);
+    cv::waitKey(1);
+}

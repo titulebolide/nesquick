@@ -1,7 +1,10 @@
 #pragma once
 
+#include <opencv2/opencv.hpp> 
+
 #include "device.hpp"
 #include "cpu.hpp"
+
 
 enum {
 	KEY_PPUCTRL = 0,
@@ -54,12 +57,16 @@ private:
     bool get_ppuctrl_bit(uint8_t status_bit);
 
     void inc_ppuaddr();
+    void render_oam(cv::Mat * frame);
+    void render_nametable(cv::Mat * frame);
+    void add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, uint8_t sprite_x, uint8_t sprite_y, uint8_t palette_no, bool hflip, bool vflip);
+    void get_sprite(uint8_t sprite[8][8], uint8_t sprite_no, bool table_no, bool doubletile);
 
-
-public:
+ public:
     PpuDevice(uint8_t * chr_rom, Device * cpu_ram);
     uint8_t get(uint16_t addr);
     void set(uint16_t addr, uint8_t val);
     void tick();
     void set_cpu(Emu6502 * cpu);
+    void render();
 };

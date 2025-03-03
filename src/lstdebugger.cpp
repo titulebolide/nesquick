@@ -18,25 +18,34 @@ uint16_t lstAddrToVal(const std::string& strAddr) {
     return val;
 }
 
-LstDebuggerAsm6::LstDebuggerAsm6(const std::string& lstfile) {
+LstDebuggerAsm6::LstDebuggerAsm6(const std::string& lstfile, bool asm6) {
     std::ifstream file(lstfile);
     if (!file) {
         throw std::runtime_error("Unable to open file");
     }
+
 
     std::string line;
     while (std::getline(file, line)) {
         if (line.empty() || line[0] != '0') {
             continue;
         }
-        uint16_t addr = lstAddrToVal(line.substr(1, 4));
-        std::string inst = line.substr(6);
+        uint16_t addr;
+        std::string inst;
+        if (asm6) {
+            addr = lstAddrToVal(line.substr(1, 4));
+            inst = line.substr(6);
+
+        } else {
+            addr = lstAddrToVal(line.substr(0, 5));
+            addr -= 0x8000;
+            inst = line.substr(11);
+        }
         inst.erase(inst.find_last_not_of(" \n\r\t") + 1); // rstrip
         inst.erase(0, inst.find_first_not_of(" \n\r\t")); // lstrip
 
         if (!inst.empty()) {
-            
-            instMap[addr] = inst + "oui";
+            instMap[addr] = inst;
         }
     }
 }
@@ -44,7 +53,6 @@ LstDebuggerAsm6::LstDebuggerAsm6(const std::string& lstfile) {
 std::string LstDebuggerAsm6::getInst(uint16_t addr) const {
     auto it = instMap.find(addr);
     if (it != instMap.end()) {
-        std::cout << "lkjlkjb" << std::endl;
         return it->second;
     }
     return "NOP";
