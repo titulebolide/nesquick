@@ -45,7 +45,7 @@ private:
     uint8_t vram[0x4000] = {0}; // 14 bit addr space
     long ntick = 0;
     uint8_t ppu_reg_w = 0;
-    uint8_t ppuaddr = 0;
+    uint16_t ppuaddr = 0;
     uint8_t ppuctrl = 0;
     uint8_t ppustatus = 0;
     uint8_t ppuoam[256] = {0};
