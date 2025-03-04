@@ -37,7 +37,7 @@ LstDebuggerAsm6::LstDebuggerAsm6(const std::string& lstfile, bool asm6) {
             inst = line.substr(6);
 
         } else {
-            addr = lstAddrToVal(line.substr(0, 5));
+            addr = lstAddrToVal(line.substr(0, 6));
             addr -= 0x8000;
             inst = line.substr(11);
         }
