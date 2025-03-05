@@ -4,7 +4,6 @@ import threading
 import evdev
 import cv2 as cv
 import multiprocessing
-import random
 import time
 
 from palette import palette as nespalette
@@ -139,7 +138,7 @@ class PpuApuIODevice:
 
         elif key == KEY_PPUSTATUS:
             # TODO : do better !!
-            return int(random.random()*255.9999) # self.ppustatus
+            return 0b10000000
         
         elif key == KEY_CTRL1:
             # TODO : In the NES and Famicom, the top three (or five) bits are not driven, and so retain the bits of the previous byte on the bus. Usually this is the most significant byte of the address of the controller port—0x40. Certain games (such as Paperboy) rely on this behavior and require that reads from the controller ports return exactly $40 or $41 as appropriate. See: Controller reading: unconnected data lines.
@@ -150,9 +149,8 @@ class PpuApuIODevice:
                 ret = 1
             else:
                 ret = ((controller_state >> self.controller_read_no) & 1)
-
-            if self.controller_strobe == 0:
-                self.controller_read_no += 1
+                if self.controller_strobe == 0:
+                    self.controller_read_no += 1
             return ret
 
         else:
