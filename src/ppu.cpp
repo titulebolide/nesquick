@@ -79,11 +79,12 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
         }
         break;
 
-    // case KEY_CTRL1:
-    //     controller_strobe = (value & 1) # get lsb
-    //     if controller_strobe == 1:
-    //         controller_read_no = 0
-    //     break:
+    case KEY_CTRL1:
+        controller_strobe = (value & 1); // get lsb
+        if (controller_strobe == 1) {
+            controller_read_no = 0;
+        }
+        break;
 
     
     default:
@@ -95,6 +96,7 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
 
 uint8_t PpuDevice::get(uint16_t addr) {
     uint8_t retval;
+    uint8_t controller_state;
     switch (addr)
     {
     case KEY_PPUDATA:
@@ -107,23 +109,24 @@ uint8_t PpuDevice::get(uint16_t addr) {
         break;
     
     case KEY_PPUSTATUS:
-        // TODO : do better than that!!
-        retval = std::rand() % 256; // ppustatus
+        // TODO : implement PPUSTATUS for real
+        retval = 0b10000000;
         break;
     
-    // case KEY_CTRL1:
-    //     // TODO : In the NES and Famicom, the top three (or five) bits are not driven, and so retain the bits of the previous byte on the bus. Usually this is the most significant byte of the address of the controller port—0x40. Certain games (such as Paperboy) rely on this behavior and require that reads from the controller ports return exactly $40 or $41 as appropriate. See: Controller reading: unconnected data lines.
-    //     controller_state = keyboard_state.value
+    case KEY_CTRL1:
+        // TODO : In the NES and Famicom, the top three (or five) bits are not driven, and so retain the bits of the previous byte on the bus. Usually this is the most significant byte of the address of the controller port—0x40. Certain games (such as Paperboy) rely on this behavior and require that reads from the controller ports return exactly $40 or $41 as appropriate. See: Controller reading: unconnected data lines.
+        controller_state = 0; // TODO link to a keyboard this
 
-    //     if controller_read_no > 7:
-    //         retval = 1
-    //     else:
-    //         retval = ((controller_state >> controller_read_no) & 1)
-
-    //     if controller_strobe == 0:
-                // TODOD dont increase if over 7 ! useless
-    //         controller_read_no += 1
-
+        if (controller_read_no > 7) {
+            retval = 1;
+        }
+        else {
+            retval = ((controller_state >> controller_read_no) & 1);
+            if (controller_strobe == 0) {
+                controller_read_no += 1;
+            }
+        }
+        break;
         
     default:
         break;
