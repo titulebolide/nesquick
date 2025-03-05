@@ -265,6 +265,10 @@ void PpuDevice::get_sprite(uint8_t sprite[8][8], uint8_t sprite_no, bool table_n
 void PpuDevice::render() {
     render_nametable(&frame);
     render_oam(&frame);
-    cv::imshow("prout", frame);
-    cv::waitKey(1);
+    // cv::imshow("prout", frame);
+    // cv::waitKey(1);
+}
+
+cv::Mat * PpuDevice::getFrame() {
+    return &frame;
 }

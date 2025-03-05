@@ -74,4 +74,5 @@ private:
     void tick();
     void set_cpu(Emu6502 * cpu);
     void render();
+    cv::Mat *getFrame();
 };
