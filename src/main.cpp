@@ -44,7 +44,8 @@ int main() {
         ppu.tick();
         loopCount++;
 
-        if (loopCount % 1000000 == 0) {
+        
+        if (loopCount % 200000 == 0) {
             ppu.render();
             auto currentTime = std::chrono::high_resolution_clock::now();
             std::chrono::duration<double> elapsed = currentTime - startTime;

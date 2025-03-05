@@ -142,22 +142,10 @@ void PpuDevice::tick() {
             cpu->interrupt(false);
         }
     }
-            // nametable_no = ppuctrl & 0b11
-            // nametable_base_addr = 0x2000 + 0x400*nametable_no
-            // renderer_queue.put_nowait(
-            //     {
-            //         "bg_table_no":get_ppuctrl_bit(PPUCTRL_BGPATTTABLE),
-            //         "nametable":vram[nametable_base_addr:nametable_base_addr+0x400],
-            //         "sprite_table_no":get_ppuctrl_bit(PPUCTRL_OAMPATTTABLE),
-            //         "ppuoam":ppuoam,
-            //         "spritesize":get_ppuctrl_bit(PPUCTRL_SPRITESIZE),
-            //         "palettes":vram[0x3f00:0x3f20]
-            //     }
-            // )
 }
 
 
-void PpuDevice::render_nametable(cv::Mat * frame) { //(self, frame, bg_table_no, nametable, palettes):
+void PpuDevice::render_nametable(cv::Mat * frame) {
     // # x is left to right
     // # y is up to down
     // # but for imshow x is up to down, y is left to right
@@ -173,7 +161,8 @@ void PpuDevice::render_nametable(cv::Mat * frame) { //(self, frame, bg_table_no,
             ||++------ Color bits 3-2 for bottom left quadrant of this byte
             ++-------- Color bits 3-2 for bottom right quadrant of this byte
             */
-            uint8_t attr_bitshift = 0;
+           uint16_t attribute_table_addr = 0x3c0 +  (static_cast<uint16_t>(sprite_y) / 4)*8 + static_cast<uint16_t>(sprite_x) / 4;
+           uint8_t attr_bitshift = 0;
             if (sprite_y % 4 > 1) {
                 // bottom
                 attr_bitshift += 4;
@@ -189,7 +178,7 @@ void PpuDevice::render_nametable(cv::Mat * frame) { //(self, frame, bg_table_no,
     }
 }
 
-void PpuDevice::render_oam(cv::Mat * frame) { //self, frame, sprite_table_no, ppuoam, spritesize, palettes):
+void PpuDevice::render_oam(cv::Mat * frame) {
     
     bool spritesize = get_ppuctrl_bit(PPUCTRL_SPRITESIZE);
 
@@ -232,13 +221,19 @@ void PpuDevice::add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, ui
             } else { // vflip and hflip
                 pix_color = sprite[7-y][7-x];
             }
-            uint8_t r = 255;
+            uint8_t r = 0;
             uint8_t g = 0;
-            uint8_t b = 255;
-            if (pix_color == 0) {
-                r = g = b = 0;
-            }
-            // r,g,b =  nespalette[palette[pix_color]]
+            uint8_t b = 0;
+            if (pix_color != 0) {
+                // 0x3f00 : palettes location in vram
+                // a palette : a set of 4 colors (4 bytes then)
+                // palette_no : the index of the palette in the palette list
+                // pix_color : the color in the palette
+                uint8_t color_no = vram[0x3f00 + static_cast<uint16_t>(palette_no) * 4 + static_cast<uint16_t>(pix_color)];
+                r = NES_COLORS[color_no][0]; // TODO : get pointer
+                g = NES_COLORS[color_no][1];
+                b = NES_COLORS[color_no][2];
+            } // TODO handle transparent color (not black)
             // TODO there are fatser ways to populate a frame
             frame->at<cv::Vec3b>(sprite_y + y, sprite_x + x) = cv::Vec3b(b, g, r);
         }
@@ -257,7 +252,7 @@ void PpuDevice::get_sprite(uint8_t sprite[8][8], uint8_t sprite_no, bool table_n
     uint16_t plane0_addr = (sprite_no + 256*table_no) << 4;
     for (uint8_t j = 0; j < 8; j++) {
         uint8_t plane0 = chr_rom[plane0_addr + j];
-        uint8_t plane1 = chr_rom[plane0_addr + j];
+        uint8_t plane1 = chr_rom[plane0_addr + j + 8];
         for (uint8_t i = 0; i < 8; i++) {
             uint8_t color0 = (plane0 >> i) & 1;
             uint8_t color1 = (plane1 >> i) & 1;
