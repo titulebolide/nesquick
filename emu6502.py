@@ -233,11 +233,11 @@ class Emu6502(threading.Thread):
             0x3e: [self.func_with_mem(self.rotate_left), ABSOLUTE_X, 3, 7, NOEC],
 
             # ROR
-            0x6a: [self.func_with_acc(self.rotate_left), ACCUMULATOR, 1, 2, NOEC],
-            0x66: [self.func_with_mem(self.rotate_left), ZEROPAGE, 2, 5, NOEC],
-            0x76: [self.func_with_mem(self.rotate_left), ZEROPAGE_X, 2, 6, NOEC],
-            0x6e: [self.func_with_mem(self.rotate_left), ABSOLUTE, 3, 6, NOEC],
-            0x7e: [self.func_with_mem(self.rotate_left), ABSOLUTE_X, 3, 7, NOEC],
+            0x6a: [self.func_with_acc(self.rotate_right), ACCUMULATOR, 1, 2, NOEC],
+            0x66: [self.func_with_mem(self.rotate_right), ZEROPAGE, 2, 5, NOEC],
+            0x76: [self.func_with_mem(self.rotate_right), ZEROPAGE_X, 2, 6, NOEC],
+            0x6e: [self.func_with_mem(self.rotate_right), ABSOLUTE, 3, 6, NOEC],
+            0x7e: [self.func_with_mem(self.rotate_right), ABSOLUTE_X, 3, 7, NOEC],
 
 
             ## LOADS
@@ -669,10 +669,10 @@ class Emu6502(threading.Thread):
         return val
 
     def rotate_right(self, val):
-        next_carry = self.get_status_bit(STATUS_CARRY)
+        curr_carry = self.get_status_bit(STATUS_CARRY)
         next_carry = int((val & 0b00000001) != 0)
         val >>= 1
-        val += next_carry << 7
+        val += curr_carry << 7
         self.update_zn_flag(val)
         self.set_status_bit(STATUS_CARRY, bool(next_carry))
         return val
@@ -769,6 +769,7 @@ class Emu6502(threading.Thread):
         )
         if "bkpt" in inst:
             time.sleep(2)
+        time.sleep(0.002)
 
 
     def interrupt(self, maskable):
