@@ -473,12 +473,14 @@ class Emu6502(threading.Thread):
         return self.mem[stack_addr]
 
     def jsr(self, addr):
-        self.stack_push(self.prgm_ctr + 2)
+        self.stack_push(high_byte(self.prgm_ctr + 2))
+        self.stack_push(low_byte(self.prgm_ctr + 2))
         self.jmp(addr)
 
     def rts(self):
-        addr = self.stack_pull()
-        self.prgm_ctr = addr + 1
+        low = self.stack_pull()
+        high = self.stack_pull()
+        self.prgm_ctr = (high << 8) + low + 1
 
     def ph(self, reg):
         # stack begins at 0x01ff and ends at 0x0100
