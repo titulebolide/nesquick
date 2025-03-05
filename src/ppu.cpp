@@ -235,7 +235,7 @@ void PpuDevice::add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, ui
                 b = NES_COLORS[color_no][2];
             } // TODO handle transparent color (not black)
             // TODO there are fatser ways to populate a frame
-            frame->at<cv::Vec3b>(sprite_y + y, sprite_x + x) = cv::Vec3b(b, g, r);
+            frame->at<cv::Vec3b>(sprite_y + y, sprite_x + x) = cv::Vec3b(r, g, b);
         }
     }
 }
