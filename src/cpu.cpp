@@ -197,7 +197,7 @@ void Emu6502::transfer(int sreg, int dreg) {
 }
 
 void Emu6502::compare(int reg, uint8_t val) {
-    bool is_carry = (regs[reg] + byte_not(val) + 1) > 255;
+    bool is_carry = (static_cast<uint16_t>(regs[reg]) + static_cast<uint16_t>(byte_not(val)) + 1) > 255;
     int diff = regs[reg] - val;
     set_status_bit(STATUS_CARRY, is_carry);
     update_zn_flag(diff); // status_zero goes to 0 if equality
@@ -242,13 +242,17 @@ void Emu6502::in_de_mem(uint16_t addr, bool sign_plus) {
 }
 
 void Emu6502::add_val_to_acc_carry(uint8_t val) {
+    // use a uint16_t to detect for a carry
+    // TODO : maybe remove some of the static cast ? 
+    uint16_t bigval = static_cast<uint16_t>(val);
     if (get_status_bit(STATUS_CARRY)) {
         // there is a carry
-        val++;
+        bigval++;
     }
-    regs[REG_A] += val;
-    set_status_bit(STATUS_CARRY, regs[REG_A] > 255);
-    regs[REG_A] &= 0xff;
+    bigval += static_cast<uint16_t>(regs[REG_A]);
+    // regs[REG_A] += val;
+    set_status_bit(STATUS_CARRY, bigval > 255);
+    regs[REG_A] &= static_cast<uint8_t>(bigval);
     update_zn_flag(regs[REG_A]);
 }
 
@@ -323,9 +327,10 @@ uint8_t Emu6502::shift_left(uint8_t val) {
 }
 
 uint8_t Emu6502::rotate_right(uint8_t val) {
+    bool curr_carry = get_status_bit(STATUS_CARRY);
     bool next_carry = (val & 0b00000001) != 0;
     val >>= 1;
-    val |= (next_carry << 7);
+    val |= (curr_carry << 7);
     update_zn_flag(val);
     set_status_bit(STATUS_CARRY, next_carry);
     return val;
@@ -335,6 +340,7 @@ uint8_t Emu6502::rotate_left(uint8_t val) {
     bool curr_carry = get_status_bit(STATUS_CARRY);
     bool next_carry = (val & 0b10000000) != 0;
     val <<= 1;
+    // no need to crop (uint8_t)
     val |= curr_carry; // bool true is interpreted as a 1
     update_zn_flag(val);
     set_status_bit(STATUS_CARRY, next_carry);
@@ -414,7 +420,7 @@ void Emu6502::dbg() {
     if (inst.find("bkpt") != std::string::npos) {
         std::this_thread::sleep_for(std::chrono::seconds(2));
     }
-    // std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    // std::this_thread::sleep_for(std::chrono::milliseconds(1));
 }
 
 void Emu6502::interrupt(bool maskable) {
@@ -432,7 +438,8 @@ void Emu6502::interrupt(bool maskable) {
 
 void Emu6502::op_reset() {
     uint16_t reset_vector = 0xfffc;
-    this->prgm_ctr = (mem->get(reset_vector + 1) << 8) + mem->get(reset_vector);
+    prgm_ctr = (mem->get(reset_vector + 1) << 8) + mem->get(reset_vector);
+    std::cout << std::hex << prgm_ctr << std::endl;
 }
 
 int Emu6502::exec_inst() {
