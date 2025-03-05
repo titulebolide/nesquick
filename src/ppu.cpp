@@ -3,7 +3,7 @@
 #include "ppu.hpp"
 
 PpuDevice::PpuDevice(uint8_t * _chr_rom, Device * cpu_ram) : 
-    cpu_ram(cpu_ram), cpu(nullptr) {
+    cpu_ram(cpu_ram), cpu(nullptr), frame(30*8, 32*8, CV_8UC3) {
 
     for (uint16_t addr = 0; addr < 0x4000; addr ++) {
         chr_rom[addr] = _chr_rom[addr];
@@ -169,12 +169,11 @@ void PpuDevice::render_nametable(cv::Mat * frame) { //(self, frame, bg_table_no,
     // # x is left to right
     // # y is up to down
     // # but for imshow x is up to down, y is left to right
-    for (int16_t sprite_y = 0; sprite_y < 30; sprite_y++) {
-        for (int16_t sprite_x = 0; sprite_x < 32; sprite_x++) {
+    for (int8_t sprite_y = 0; sprite_y < 30; sprite_y++) {
+        for (int8_t sprite_x = 0; sprite_x < 32; sprite_x++) {
             uint16_t nametable_no = ppuctrl & 0b11;
             uint16_t nametable_base_addr = 0x2000 + 0x400*nametable_no;
             uint8_t sprite_no = vram[nametable_base_addr + sprite_x + sprite_y * 32];
-            uint16_t attribute_table_addr = 0x3c0 +  (sprite_y / 4)*8 + sprite_x / 4;
             /*
             7654 3210
             |||| ||++- Color bits 3-2 for top left quadrant of this byte
@@ -241,17 +240,15 @@ void PpuDevice::add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, ui
             } else { // vflip and hflip
                 pix_color = sprite[7-y][7-x];
             }
-            if (pix_color == 0) {
-                continue;
-            }
-            // r,g,b =  nespalette[palette[pix_color]]
             uint8_t r = 255;
             uint8_t g = 0;
             uint8_t b = 255;
+            if (pix_color == 0) {
+                r = g = b = 0;
+            }
+            // r,g,b =  nespalette[palette[pix_color]]
             // TODO there are fatser ways to populate a frame
-            frame->at<uint8_t>(sprite_y + y, sprite_x + x, 0) = b;
-            // frame->at<uint8_t>(sprite_y + y, sprite_x + x, 1) = g;
-            // frame->at<uint8_t>(sprite_y + y, sprite_x + x, 2) = r;
+            frame->at<cv::Vec3b>(sprite_y + y, sprite_x + x) = cv::Vec3b(b, g, r);
         }
     }
 }
@@ -279,7 +276,6 @@ void PpuDevice::get_sprite(uint8_t sprite[8][8], uint8_t sprite_no, bool table_n
 }
 
 void PpuDevice::render() {
-    cv::Mat frame(30*8, 32*8, CV_8UC3);
     render_nametable(&frame);
     render_oam(&frame);
     cv::imshow("prout", frame);

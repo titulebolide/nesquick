@@ -252,7 +252,7 @@ void Emu6502::add_val_to_acc_carry(uint8_t val) {
     bigval += static_cast<uint16_t>(regs[REG_A]);
     // regs[REG_A] += val;
     set_status_bit(STATUS_CARRY, bigval > 255);
-    regs[REG_A] &= static_cast<uint8_t>(bigval);
+    regs[REG_A] = static_cast<uint8_t>(bigval);
     update_zn_flag(regs[REG_A]);
 }
 
@@ -479,7 +479,7 @@ int Emu6502::exec_inst() {
     // op_extra_cycles used only by branch ot report if the branching caused an extrac cycle
     op_extra_cycles = 0;
 
-    if (!(op.addr_mode == IMPLICIT || op.addr_mode == ACCUMULATOR || op.addr_mode == BRANCHEC)) {
+    if (!(op.addr_mode == IMPLICIT || op.addr_mode == ACCUMULATOR)) {
         bool page_crossed;
         op_addr = get_addr(op.addr_mode, &page_crossed);
         if (page_crossed) {

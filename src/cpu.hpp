@@ -135,7 +135,7 @@ private:
     void op_sed() { set_status_bit(STATUS_DEC, true); }
     void op_sei() { set_status_bit(STATUS_INTER, true); }
 
-    void op_lsr_acc() { regs[REG_A] = rotate_right(regs[REG_A]); }
+    void op_lsr_acc() { regs[REG_A] = shift_right(regs[REG_A]); }
     void op_asl_acc() { regs[REG_A] = shift_left(regs[REG_A]); }
     void op_ror_acc() { regs[REG_A] = rotate_right(regs[REG_A]); }
     void op_rol_acc() { regs[REG_A] = rotate_left(regs[REG_A]); }
@@ -355,7 +355,7 @@ private:
         {0xa8, {&Emu6502::op_tay, IMPLICIT, 1, 2, NOEC}}, // TAY
         {0xba, {&Emu6502::op_tsx, IMPLICIT, 1, 2, NOEC}}, // TSX
         {0x8a, {&Emu6502::op_txa, IMPLICIT, 1, 2, NOEC}}, // TXA
-        {0x9a, {&Emu6502::op_tsx, IMPLICIT, 1, 2, NOEC}}, // TXS
+        {0x9a, {&Emu6502::op_txs, IMPLICIT, 1, 2, NOEC}}, // TXS
         {0x98, {&Emu6502::op_tya, IMPLICIT, 1, 2, NOEC}}, // TYA
     
         // COMPARE

@@ -53,6 +53,8 @@ private:
 
     uint8_t controller_strobe = 0;
     uint8_t controller_read_no = 0;
+
+    cv::Mat frame;
     
     bool get_ppuctrl_bit(uint8_t status_bit);
 
