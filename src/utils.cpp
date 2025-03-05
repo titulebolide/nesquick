@@ -38,8 +38,14 @@ std::string hex2(uint8_t val) {
 
 std::string hexstr(uint8_t value) {
     std::stringstream ss;
-    ss << "0x"
-       << std::setw(2) << std::setfill('0')
+    ss << std::setw(2) << std::setfill('0')
+       << std::hex << static_cast<int>(value);
+    return ss.str();
+}
+
+std::string hexstr(uint16_t value) {
+    std::stringstream ss;
+    ss << std::setw(4) << std::setfill('0')
        << std::hex << static_cast<int>(value);
     return ss.str();
 }
