@@ -63,7 +63,11 @@ def bin8(val):
 
 def hex2(val):
     s = hex(val)[2:]
-    return '0x' + '0'*max(0,(2-len(s))) + s
+    return '0'*max(0,(2-len(s))) + s
+
+def hex4(val):
+    s = hex(val)[2:]
+    return '0'*max(0,(4-len(s))) + s
 
 class Memory:
     def __init__(self, memory_map):
@@ -752,16 +756,16 @@ class Emu6502(threading.Thread):
             inst = self.lst.get_inst(self.prgm_ctr)
         print(
             "\n",
-            "PC\tinst\tA\tX\tY\tSP\t  NV-BDIZC",
+            "PC\tinst\tA\tX\tY\tSP\tNV-BDIZC",
             "\n",
             "\t".join((
-                hex(self.prgm_ctr),
+                hex4(self.prgm_ctr),
                 hex2(self.mem[self.prgm_ctr]),
                 hex2(self.regs[REG_A]),
                 hex2(self.regs[REG_X]),
                 hex2(self.regs[REG_Y]),
                 hex2(self.stack_ptr),
-                bin8(self.regs[REG_S]),
+                bin8(self.regs[REG_S])[2:],
             )),
             "\n",
             inst,
@@ -769,7 +773,6 @@ class Emu6502(threading.Thread):
         )
         if "bkpt" in inst:
             time.sleep(2)
-        time.sleep(0.002)
 
 
     def interrupt(self, maskable):
