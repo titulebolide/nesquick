@@ -420,7 +420,6 @@ void Emu6502::dbg() {
     if (inst.find("bkpt") != std::string::npos) {
         std::this_thread::sleep_for(std::chrono::seconds(2));
     }
-    // std::this_thread::sleep_for(std::chrono::milliseconds(1));
 }
 
 void Emu6502::interrupt(bool maskable) {
@@ -439,7 +438,6 @@ void Emu6502::interrupt(bool maskable) {
 void Emu6502::op_reset() {
     uint16_t reset_vector = 0xfffc;
     prgm_ctr = (mem->get(reset_vector + 1) << 8) + mem->get(reset_vector);
-    std::cout << std::hex << prgm_ctr << std::endl;
 }
 
 int Emu6502::exec_inst() {

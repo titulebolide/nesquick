@@ -10,17 +10,6 @@ PpuDevice::PpuDevice(uint8_t * _chr_rom, Device * cpu_ram) :
     }
 }
 
-
-    // def set_cpu_interrupt(self, cpu_interrupt):
-    //     cpu_interrupt = cpu_interrupt
-
-    // def set_cpu_ram(self, cpu_ram):
-    //     """
-    //     Used for PPU OAMDMA
-    //     Not really proud of doing it this way
-    //     """
-    //     cpu_ram = cpu_ram
-
 void PpuDevice::set_cpu(Emu6502 *_cpu) {
     cpu = _cpu;
 }
