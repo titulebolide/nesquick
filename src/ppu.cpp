@@ -14,6 +14,10 @@ void PpuDevice::set_cpu(Emu6502 *_cpu) {
     cpu = _cpu;
 }
 
+void PpuDevice::set_kb_state(uint8_t kb_state) {
+    m_kb_state = kb_state;
+}
+
 bool PpuDevice::get_ppuctrl_bit(uint8_t status_bit) {
     return ((ppuctrl & status_bit) != 0);
 }
@@ -115,7 +119,7 @@ uint8_t PpuDevice::get(uint16_t addr) {
     
     case KEY_CTRL1:
         // TODO : In the NES and Famicom, the top three (or five) bits are not driven, and so retain the bits of the previous byte on the bus. Usually this is the most significant byte of the address of the controller port—0x40. Certain games (such as Paperboy) rely on this behavior and require that reads from the controller ports return exactly $40 or $41 as appropriate. See: Controller reading: unconnected data lines.
-        controller_state = 0; // TODO link to a keyboard this
+        controller_state = m_kb_state; // TODO link to a keyboard this
 
         if (controller_read_no > 7) {
             retval = 1;

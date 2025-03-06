@@ -11,5 +11,6 @@ std::string bin8(uint8_t val);
 std::string hex2(uint8_t val);
 uint16_t lstAddrToVal(const std::string& strAddr);
 std::string hexstr(uint8_t value);
+std::string binstr(uint8_t value);
 std::string hexstr(uint16_t value);
 void parseInes(const std::string& filename, uint8_t * prg, uint8_t * chr);

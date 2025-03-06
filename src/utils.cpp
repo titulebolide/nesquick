@@ -36,6 +36,12 @@ std::string hex2(uint8_t val) {
     return ss.str();
 }
 
+std::string binstr(uint8_t value) {
+    std::stringstream ss;
+    ss << std::bitset<8>{value};
+    return ss.str();
+}
+
 std::string hexstr(uint8_t value) {
     std::stringstream ss;
     ss << std::setw(2) << std::setfill('0')

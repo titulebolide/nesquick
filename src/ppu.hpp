@@ -57,6 +57,8 @@ private:
     uint8_t controller_strobe = 0;
     uint8_t controller_read_no = 0;
 
+    uint8_t m_kb_state = 0;
+
     cv::Mat frame;
     
     bool get_ppuctrl_bit(uint8_t status_bit);
@@ -73,6 +75,7 @@ private:
     void set(uint16_t addr, uint8_t val);
     void tick();
     void set_cpu(Emu6502 * cpu);
+    void set_kb_state(uint8_t kb_state);
     void render();
     cv::Mat *getFrame();
 };
