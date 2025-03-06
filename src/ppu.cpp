@@ -177,7 +177,7 @@ void PpuDevice::render_nametable(cv::Mat * frame) {
             }
             uint8_t palette_no = ((vram[nametable_base_addr + attribute_table_addr] >> attr_bitshift) & 0b11);
             bool table_no = get_ppuctrl_bit(PPUCTRL_BGPATTTABLE);
-            add_sprite(frame, sprite_no, table_no, sprite_x*8, sprite_y*8, palette_no, false, false);
+            add_sprite(frame, sprite_no, table_no, sprite_x*8, sprite_y*8, palette_no, false, false, false);
         }
     }
 }
@@ -201,14 +201,14 @@ void PpuDevice::render_oam(cv::Mat * frame) {
             bool vflip = ((sprite_attr & PPUOAM_ATT_VFLIP) != 0);
             uint8_t palette_no = (sprite_attr & 0b11) + 4; // add 4 to reach OAM palette
             bool table_no = get_ppuctrl_bit(PPUCTRL_OAMPATTTABLE);
-            add_sprite(frame, sprite_no, table_no, sprite_x, sprite_y, palette_no, hflip, vflip);
+            add_sprite(frame, sprite_no, table_no, sprite_x, sprite_y, palette_no, hflip, vflip, true);
         }
     } else {
         throw std::runtime_error("16x8 tiles not supported yet");
     }
 }
 
-void PpuDevice::add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, uint8_t sprite_x, uint8_t sprite_y, uint8_t palette_no, bool hflip, bool vflip) { //(self, sprite_no, sprite_table_no, frame, spritex, spritey, palette_no, palettes, hflip, vflip):
+void PpuDevice::add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, uint8_t sprite_x, uint8_t sprite_y, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg) { //(self, sprite_no, sprite_table_no, frame, spritex, spritey, palette_no, palettes, hflip, vflip):
     // palette = palettes[palette_no*4:palette_no*4 + 4]
     uint8_t sprite[8][8];
     get_sprite(sprite, sprite_no, table_no, false);
@@ -227,7 +227,7 @@ void PpuDevice::add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, ui
             }
             uint8_t r = 0;
             uint8_t g = 0;
-            uint8_t b = 0;
+            uint8_t b = 0; // TODO : set here transparent bg
             if (pix_color != 0) {
                 // 0x3f00 : palettes location in vram
                 // a palette : a set of 4 colors (4 bytes then)
@@ -237,7 +237,9 @@ void PpuDevice::add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, ui
                 r = NES_COLORS[color_no][0]; // TODO : get pointer
                 g = NES_COLORS[color_no][1];
                 b = NES_COLORS[color_no][2];
-            } // TODO handle transparent color (not black)
+            } else if (transparent_bg) {
+                continue;
+            }
             // TODO there are fatser ways to populate a frame
             frame->at<cv::Vec3b>(sprite_y + y, sprite_x + x) = cv::Vec3b(r, g, b);
         }
