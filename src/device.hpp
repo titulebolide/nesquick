@@ -1,4 +1,4 @@
-# pragma once
+#pragma once
 
 #include <cstdint>
 #include <stdexcept>
@@ -12,16 +12,17 @@ public:
 class CartridgeRomDevice : public Device {
  private:
     uint8_t mem[0x8000];
+    uint16_t m_base_addr;
 
  public:
-    CartridgeRomDevice(uint8_t * prg_rom) {
+    CartridgeRomDevice(uint8_t * prg_rom, uint16_t base_addr) : m_base_addr(base_addr) {
         for (uint16_t addr = 0; addr < 0x8000; addr ++) {
             mem[addr] = prg_rom[addr];
         }
     }
 
     uint8_t get(uint16_t addr) {
-        return mem[addr];
+        return mem[addr - m_base_addr];
     }
 
     void set(uint16_t addr, uint8_t val) {
@@ -33,13 +34,17 @@ class CartridgeRomDevice : public Device {
 class RamDevice : public Device {
  private:
     uint8_t mem[0x8000];
+    uint16_t m_base_addr;
 
  public:
+    RamDevice(uint16_t base_addr) : m_base_addr(base_addr) {
+    }
+
     uint8_t get(uint16_t addr) {
-        return mem[addr];
+        return mem[addr - m_base_addr];
     }
 
     void set(uint16_t addr, uint8_t val) {
-        mem[addr] = val;
+        mem[addr - m_base_addr] = val;
     }
 };

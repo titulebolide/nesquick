@@ -8,6 +8,7 @@
 #include "utils.hpp"
 #include "device.hpp"
 #include "ppu.hpp"
+#include "apu.hpp"
 
 #include <opencv2/opencv.hpp>
 #include <SDL.h>
@@ -29,7 +30,9 @@ void turn_bit_on(uint8_t * value, uint8_t bit) {
 }
 
 
-void ui(PpuDevice * ppu) {
+void ui(PpuDevice * ppu, ApuDevice * apu) {
+    
+    // init SDL
     struct sigaction action;
     sigaction(SIGINT, NULL, &action);
     SDL_Init(SDL_INIT_EVERYTHING);
@@ -39,7 +42,9 @@ void ui(PpuDevice * ppu) {
     }
     sigaction(SIGINT, &action, NULL);
 
-    Beeper b;
+
+    apu->start_sound();
+
 
     if(!SDL_SetHint(SDL_HINT_VIDEO_X11_NET_WM_BYPASS_COMPOSITOR, "0"))
     {
@@ -73,19 +78,17 @@ void ui(PpuDevice * ppu) {
 
     cv::Mat * frame = ppu->getFrame();
     
-    bool quit = false;
+    bool thread_done = false;
 
     uint8_t kb_state = 0;
 
-    int n = 0;
-
-    while(!quit) {
+    while(!thread_done) {
         SDL_Event e;
         uint8_t kb_status = 0;
         // Wait indefinitely for the next available event
         while (SDL_PollEvent(&e)) {
             if (e.type == SDL_QUIT) {
-                quit = true;
+                thread_done = true;
             }
             if (e.type == SDL_KEYDOWN | e.type == SDL_KEYUP) {
                 uint8_t keycode = 0;
@@ -101,35 +104,15 @@ void ui(PpuDevice * ppu) {
                 }
             }
         }
-        // std::cout << ppu->get_period_sq1() << std::endl;
-        if (ppu->is_sq1_fresh()) {
-            uint16_t period;
-            uint8_t length;
-            ppu->get_period_sq1(&period, &length);
-            std::cout << "sq1: " << period << " " << static_cast<int>(length) << std::endl;
-            b.setFrequency1(1789773 /  (16.0f*( static_cast<float>(period) + 1)), static_cast<float>(length)/240.0f);
-        }
-        if (ppu->is_sq2_fresh()) {
-            uint16_t period;
-            uint8_t length;
-            ppu->get_period_sq2(&period, &length);
-            std::cout << "sq2: " << period << " " << static_cast<int>(length) << std::endl;
-            b.setFrequency2(1789773 /  (16.0f*( static_cast<float>(period) + 1)), static_cast<float>(length)/240.0f);
-        }
-        
-        n++;
-        if (n % 4 == 0) {
-            n = 0;
 
-            ppu->set_kb_state(kb_state);
-            ppu->render();
+        ppu->set_kb_state(kb_state);
+        ppu->render();
 
-            SDL_UpdateTexture(texture, nullptr, frame->data, frame->step1());
-            SDL_RenderClear(renderer);
-            SDL_RenderCopy(renderer, texture, nullptr, nullptr);
-            SDL_RenderPresent(renderer);
-        }
-        SDL_Delay(10);
+        SDL_UpdateTexture(texture, nullptr, frame->data, frame->step1());
+        SDL_RenderClear(renderer);
+        SDL_RenderCopy(renderer, texture, nullptr, nullptr);
+        SDL_RenderPresent(renderer);
+        SDL_Delay(40);
     }
 
     SDL_DestroyTexture(texture);
@@ -138,10 +121,9 @@ void ui(PpuDevice * ppu) {
     SDL_Quit();
 }
 
-void run(Emu6502 * cpu, PpuDevice * ppu, bool * kill) {
+void run(Emu6502 * cpu, PpuDevice * ppu, ApuDevice * apu, bool * thread_done) {
     unsigned long long loopCount = 0;
-    auto startTime = std::chrono::high_resolution_clock::now();
-    while (!(*kill)) {
+    while (!(*thread_done)) {
         cpu->tick();
         ppu->tick();
         ppu->tick();
@@ -152,15 +134,6 @@ void run(Emu6502 * cpu, PpuDevice * ppu, bool * kill) {
             // slow down !
             std::this_thread::sleep_for(std::chrono::milliseconds(30));
         }
-
-        // if (loopCount % 200000 == 0) {
-        //     auto currentTime = std::chrono::high_resolution_clock::now();
-        //     std::chrono::duration<double> elapsed = currentTime - startTime;
-        //     double loopsPerSecond = loopCount / elapsed.count();
-        //     std::cout << "Loops per second: " << loopsPerSecond << std::endl;
-        //     loopCount = 0;
-        //     startTime = currentTime;
-        // }
     }
 }
 
@@ -171,28 +144,27 @@ int main() {
     parseInes("../rom/Donkey-Kong-NES-Disassembly/dk.nes", prg, chr);
     LstDebuggerAsm6 lst("../rom/Donkey-Kong-NES-Disassembly/dk.lst", true);
 
-    CartridgeRomDevice rom(prg);
-    RamDevice ram;
+    CartridgeRomDevice rom(prg, 0xc000);
+    RamDevice ram(0x0000);
     PpuDevice ppu(chr, &ram);
+    ApuDevice apu;
 
     Memory mem({
         {0x0000, &ram},
         {0x2000, &ppu},
+        {0x4000, &apu},
+        {0x4014, &ppu},
         {0xc000, &rom},
     });
-
 
     Emu6502 cpu(&mem, false, &lst);
     ppu.set_cpu(&cpu); // urgh
 
-    unsigned long long loopCount = 0;
-    auto startTime = std::chrono::high_resolution_clock::now();
-
 
     bool kill = false;
-    std::thread t1(run, &cpu, &ppu, &kill); 
+    std::thread t1(run, &cpu, &ppu, &apu, &kill); 
 
-    ui(&ppu);
+    ui(&ppu, &apu);
 
     kill = true;
 

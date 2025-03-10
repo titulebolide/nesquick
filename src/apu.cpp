@@ -4,6 +4,10 @@ ApuDevice::ApuDevice() {
     return;
 }
 
+void ApuDevice::start_sound() {
+    m_sound_engine.start_sound();
+}
+
 uint8_t ApuDevice::get(uint16_t addr) {
     return 0;
 }
@@ -24,6 +28,9 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
         m_period_sq1 = (static_cast<uint16_t>(value & 0b111) << 8) | (m_period_sq1 & 0x00ff);
         m_sq1_length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
         m_is_sq1_fresh = true;
+
+        std::cout << "sq1: " << m_period_sq1 << " " << static_cast<int>(m_sq1_length) << std::endl;
+        m_sound_engine.setFrequency1(1789773 /  (16.0f*( static_cast<float>(m_period_sq1) + 1)), static_cast<float>(m_sq1_length)/240.0f);
         break;
 
     case KEY_CTRL1_SQ2:
@@ -38,6 +45,9 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
         m_period_sq2 = (static_cast<uint16_t>(value & 0b111) << 8) | (m_period_sq2 & 0x00ff);
         m_sq2_length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
         m_is_sq2_fresh = true;
+
+        std::cout << "sq2: " << m_period_sq2 << " " << static_cast<int>(m_sq2_length) << std::endl;
+        m_sound_engine.setFrequency2(1789773 /  (16.0f*( static_cast<float>(m_period_sq2) + 1)), static_cast<float>(m_sq2_length)/240.0f);
         break;
 
     case KEY_PERIOD_TRI_LOW:

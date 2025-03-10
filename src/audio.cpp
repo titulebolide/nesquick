@@ -2,8 +2,9 @@
 
 void audio_callback(void*, Uint8*, int);
 
-Beeper::Beeper()
-{
+SoundEngine::SoundEngine() {}
+
+void SoundEngine::start_sound() {
     SDL_AudioSpec desiredSpec;
 
     desiredSpec.freq = SAMPLE_RATE;
@@ -35,25 +36,25 @@ Beeper::Beeper()
     SDL_PauseAudio(0);
 }
 
-Beeper::~Beeper()
+SoundEngine::~SoundEngine()
 {
     SDL_CloseAudio();
 }
 
-void Beeper::setFrequency1(float frequency, float duration)
+void SoundEngine::setFrequency1(float frequency, float duration)
 {
     m_frequency_1 = frequency;
     m_sq1_cur_dur = duration;
 }
 
-void Beeper::setFrequency2(float frequency, float duration)
+void SoundEngine::setFrequency2(float frequency, float duration)
 {
     m_frequency_2 = frequency;
     m_sq2_cur_dur = duration;
 }
 
 
-void Beeper::generateSamples(Sint16 *stream, int length)
+void SoundEngine::generateSamples(Sint16 *stream, int length)
 {
     for (int i = 0; i < length; i++) {
         
@@ -88,7 +89,7 @@ void audio_callback(void *_beeper, Uint8 *_stream, int _length)
 {
     Sint16 *stream = (Sint16*) _stream;
     int length = _length / 2;
-    Beeper* beeper = (Beeper*) _beeper;
+    SoundEngine* beeper = (SoundEngine*) _beeper;
 
     beeper->generateSamples(stream, length);
 }

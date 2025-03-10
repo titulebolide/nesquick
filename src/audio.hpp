@@ -10,7 +10,7 @@ const float SAMPLE_RATE_PEROOD = 1.0f / SAMPLE_RATE;
 const int BASE_FREQUENCY = 440;  // Base frequency in Hz (A4 note)
 const float MODULATION_FREQUENCY = 10;  // Frequency of the frequency modulation in Hz
 
-class Beeper
+class SoundEngine
 {
 private:
     double phase1;  // Tracks the phase of the sine wave
@@ -22,8 +22,9 @@ private:
     double m_sq2_cur_dur;
 
 public:
-    Beeper();
-    ~Beeper();
+    SoundEngine();
+    ~SoundEngine();
+    void start_sound();
     void generateSamples(Sint16 *stream, int length);
     double getInstantaneousFrequency();
     void setFrequency1(float frequency, float duration);  

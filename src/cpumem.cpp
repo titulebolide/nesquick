@@ -22,7 +22,7 @@ Memory::Memory(const std::vector<std::pair<uint16_t, Device *>>& memory_map) {
 uint8_t Memory::get(uint16_t index) {
     for (auto& pair : mmap) {
         if (index >= pair.first) {
-            return pair.second->get(index - pair.first);
+            return pair.second->get(index);
         }
     }
     throw std::runtime_error("Bad memory map");
@@ -31,7 +31,7 @@ uint8_t Memory::get(uint16_t index) {
 void Memory::set(uint16_t index, uint8_t value) {
     for (auto& pair : mmap) {
         if (index >= pair.first) {
-            pair.second->set(index - pair.first, value);
+            pair.second->set(index, value);
             return;
         }
     }

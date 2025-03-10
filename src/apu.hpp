@@ -1,11 +1,12 @@
 #pragma once
 #include "device.hpp"
+#include "audio.hpp"
 
 enum {
     KEY_CTRL1_SQ1 = 0x4000,
     KEY_PERIOD_SQ1_LOW = 0x4002,
     KEY_PERIOD_SQ1_HIGH = 0x4003,
-    KEY_CTRL1_SQ2 = 0x42004,
+    KEY_CTRL1_SQ2 = 0x4004,
     KEY_PERIOD_SQ2_LOW = 0x4006,
     KEY_PERIOD_SQ2_HIGH = 0x4007,
     KEY_PERIOD_TRI_LOW = 0x400A,
@@ -20,6 +21,7 @@ class ApuDevice : public Device {
     void tick();
     uint8_t get(uint16_t addr);
     void set(uint16_t addr, uint8_t val);
+    void start_sound();
 
     void get_period_sq1(uint16_t * period, uint8_t * length);
     void get_period_sq2(uint16_t * period, uint8_t * length);
@@ -38,4 +40,5 @@ class ApuDevice : public Device {
 
     bool m_is_sq1_fresh = false;
     bool m_is_sq2_fresh = false;
+    SoundEngine m_sound_engine;
 };
