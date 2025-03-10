@@ -34,7 +34,7 @@ SoundEngine::~SoundEngine()
 }
 
 void SoundEngine::validateChannelNo(int channel) {
-    if (!(channel <= 1 && channel >= 0)) {
+    if (!(channel <= 2 && channel >= 0)) {
         throw std::runtime_error("Bad channel number");
     }
 }
@@ -68,13 +68,15 @@ void SoundEngine::generateSamples(Sint16 *stream, int length)
 {
     for (int i = 0; i < length; i++) {
         stream[i] = 0;
+        
         for (int chan_no=0; chan_no < 2; chan_no++) {
             squareWave * channel = &m_square[chan_no];
+            // std::cout << channel->enabled << " " << channel->left_duration << " " << channel->duty_cycle << " " << channel->current_phase << " " << channel->amplitude << std::endl;
             if (!(channel->enabled && channel->left_duration > 0)) {
                 continue;
             }
-            stream[i] += channel->amplitude * (channel->current_phase < 2 * M_PI * channel->duty_cycle ? 1:-1);
-            channel->left_duration -= 1/SAMPLE_RATE;
+            stream[i] += channel->amplitude * ((channel->current_phase < 2 * M_PI * channel->duty_cycle) ? 1.0f:-1.0f);
+            channel->left_duration -= 1.0f/SAMPLE_RATE;
             // increase phase only if playing
             channel->current_phase += 2 * M_PI * channel->frequency / SAMPLE_RATE;
             // Wrap phase to avoid overflow
@@ -82,6 +84,24 @@ void SoundEngine::generateSamples(Sint16 *stream, int length)
                 channel->current_phase -= 2 * M_PI;
             }
         }
+
+        squareWave * channel = &m_square[2];
+
+        if ((channel->enabled && channel->left_duration > 0)) {
+            if (channel->current_phase < M_PI) {
+                stream[i] += channel->amplitude * (channel->current_phase/M_PI*2 - 1);
+            } else {
+                stream[i] += channel->amplitude * (3 - channel->current_phase/M_PI*2);
+            }
+        }
+        channel->left_duration -= 1.0f/SAMPLE_RATE;
+        // increase phase only if playing
+        channel->current_phase += 2 * M_PI * channel->frequency / SAMPLE_RATE;
+        // Wrap phase to avoid overflow
+        if (channel->current_phase > 2 * M_PI) {
+            channel->current_phase -= 2 * M_PI;
+        }
+
     }
 }
 

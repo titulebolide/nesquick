@@ -63,11 +63,22 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
         );
         break;
 
+    case KEY_TRI_PERIOD_LOW:
+        m_triangle.period = (m_triangle.period & 0xff00) | static_cast<uint16_t>(value);
+        break;
+
+    case KEY_TRI_PERIOD_HIGH:
+        m_triangle.period = (static_cast<uint16_t>(value & 0b111) << 8) | (m_triangle.period & 0x00ff);
+        m_triangle.length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
+        m_sound_engine.setFrequency(2, 1789773 / (16.0f*( static_cast<float>(m_square2.period) + 1)) / 2, m_square2.length / 240.0f);
+        break;
+
     case KEY_STATUS:
         // TODO : send 0 on powerup / reset
         // TODO : partially implemented
         m_sound_engine.setChannelEnable(0, (value & BIT0) != 0);
         m_sound_engine.setChannelEnable(1, (value & BIT1) != 0);
+        m_sound_engine.setChannelEnable(2, (value & BIT2) != 0);
         break;
 
     case KEY_SETMODE:
@@ -136,19 +147,14 @@ void ApuDevice::tick() {
 void ApuDevice::quarter_frame_tick() {
     // handle envelope
     float amplitude1, amplitude2 = 0;
-    if (m_square1.enable) {
-        if (m_square1.constant_volume) {
-            std::cout << m_square1.volume << std::endl;
-            amplitude1 = static_cast<float>(m_square1.volume)/15*14000;
-        }
+    if (m_square1.constant_volume) {
+        amplitude1 = static_cast<float>(m_square1.volume)/15*14000;
     }
-    if (m_square2.enable) {
-        if (m_square2.constant_volume) {
-            amplitude2 = static_cast<float>(m_square2.volume)/15*14000;
-        }
+    if (m_square2.constant_volume) {
+        amplitude2 = static_cast<float>(m_square2.volume)/15*14000;
     }
-    m_sound_engine.setAmplitude(0, amplitude1);
-    m_sound_engine.setAmplitude(1, amplitude2);
+    // m_sound_engine.setAmplitude(0, amplitude1);
+    // m_sound_engine.setAmplitude(1, amplitude2);
 
 }
 

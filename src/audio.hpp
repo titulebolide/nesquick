@@ -20,17 +20,17 @@ enum {
 struct squareWave {
     float frequency = 400;
     float left_duration = 0;
-    float amplitude = AMPLITUDE/2; // TODO : try setting at 0 the init amplitude
+    float amplitude = AMPLITUDE/4; // TODO : try setting at 0 the init amplitude
     double current_phase = 0; // Tracks the phase of the wave
     float duty_cycle = 0.5;
-    bool enabled = false;
+    bool enabled = true;
 };
 
 class SoundEngine
 {
 private:
     Uint32 start_time;  // Tracks the start time for modulation
-    squareWave m_square[2];
+    squareWave m_square[3];
     void validateChannelNo(int channel);
     float getWave(float phase, int duty_cycle);
 
