@@ -1,16 +1,36 @@
 #pragma once
 #include "device.hpp"
 #include "audio.hpp"
+#include "cpu.hpp"
 
 enum {
-    KEY_CTRL1_SQ1 = 0x4000,
-    KEY_PERIOD_SQ1_LOW = 0x4002,
-    KEY_PERIOD_SQ1_HIGH = 0x4003,
-    KEY_CTRL1_SQ2 = 0x4004,
-    KEY_PERIOD_SQ2_LOW = 0x4006,
-    KEY_PERIOD_SQ2_HIGH = 0x4007,
-    KEY_PERIOD_TRI_LOW = 0x400A,
-    KEY_PERIOD_TRI_HIGH = 0x400B,
+    KEY_PULSE1_DUTY_ENVELOPE = 0x4000,
+    KEY_PULSE1_PERIOD_LOW = 0x4002,
+    KEY_PULSE1_PERIOD_HIGH = 0x4003,
+
+    KEY_PULSE2_DUTY_ENVELOPE = 0x4004,
+    KEY_PULSE2_PERIOD_LOW = 0x4006,
+    KEY_PULSE2_PERIOD_HIGH = 0x4007,
+
+    KEY_TRI_PERIOD_LOW = 0x400A,
+    KEY_TRI_PERIOD_HIGH = 0x400B,
+
+    KEY_SETMODE = 0x4017, // forwarded by the PPU
+};
+
+struct squarePulse {
+    uint16_t period = 0;
+    uint8_t length = 0;
+    uint8_t duty = 0;
+    bool constant_volume = false;
+    uint8_t volume = 0; // volume to be used in constant volume mode
+};
+
+const long APU_FRAME_CYCLE_COUNT = 3728; // NTSC
+
+enum {
+    SEQUENCER_4STEP_MODE = 0,
+    SEQUENCER_5STEP_MODE = 1,
 };
 
 const uint8_t APU_LENGTH_COUNTER_LOAD[32] = {10, 254, 20, 2, 40, 4, 80, 6, 160, 8, 60, 10, 14, 12, 26, 14, 12, 16, 24, 18, 48, 20, 96, 22, 192, 24, 72, 26, 16, 28, 32, 30};
@@ -22,23 +42,24 @@ class ApuDevice : public Device {
     uint8_t get(uint16_t addr);
     void set(uint16_t addr, uint8_t val);
     void start_sound();
-
-    void get_period_sq1(uint16_t * period, uint8_t * length);
-    void get_period_sq2(uint16_t * period, uint8_t * length);
-    uint16_t get_period_tri();
-    bool is_sq1_fresh();
-    bool is_sq2_fresh();
+    void set_cpu(Emu6502 * cpu);
 
  private:
-    bool m_enable_sq1 = false;
-    bool m_enable_sq2 = false;
-    uint16_t m_period_sq1 = 0;
-    uint16_t m_period_sq2 = 0;
-    uint16_t m_period_tri = 0;
-    uint8_t m_sq1_length = 0;
-    uint8_t m_sq2_length = 0;
+    void quarter_frame_tick();
+    void half_frame_tick();
 
-    bool m_is_sq1_fresh = false;
-    bool m_is_sq2_fresh = false;
+ private:
+    // TODO : needed to call IRQ, bu can do better than this
+    Emu6502 * m_cpu;
+    squarePulse m_square1;
+    squarePulse m_square2;
+
+    // set by 0x4017
+    // TODO : handle IRQ flag?
+    bool m_enable_irq = false;
+    bool m_sequencer_mode = false;
+
+    long m_apu_cycle_count = 0;
+
     SoundEngine m_sound_engine;
 };

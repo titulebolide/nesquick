@@ -39,6 +39,8 @@ private:
 
     // TODO : this is quite bad, we share here cpuram for OAMDMA
     Device * cpu_ram;
+    // Same, needed to forward 4017 writes...
+    Device * m_apu;
     // this is used to call the interrupt, same, could do better (interface ?)
     Emu6502 * cpu;
 
@@ -58,7 +60,7 @@ private:
     uint8_t controller_read_no = 0;
 
     uint8_t m_kb_state = 0;
-
+    
     cv::Mat frame;
     
     bool get_ppuctrl_bit(uint8_t status_bit);
@@ -70,7 +72,7 @@ private:
     void get_sprite(uint8_t sprite[8][8], uint8_t sprite_no, bool table_no, bool doubletile);
 
  public:
-    PpuDevice(uint8_t * chr_rom, Device * cpu_ram);
+    PpuDevice(uint8_t * chr_rom, Device * cpu_ram, Device * apu);
     uint8_t get(uint16_t addr);
     void set(uint16_t addr, uint8_t val);
     void tick();

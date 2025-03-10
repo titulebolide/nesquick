@@ -125,14 +125,24 @@ void run(Emu6502 * cpu, PpuDevice * ppu, ApuDevice * apu, bool * thread_done) {
     unsigned long long loopCount = 0;
     while (!(*thread_done)) {
         cpu->tick();
+
         ppu->tick();
         ppu->tick();
         ppu->tick();
+
+        cpu->tick();
+
+        ppu->tick();
+        ppu->tick();
+        ppu->tick();
+
+        apu->tick();
+    
         loopCount++;
 
         if (loopCount % 100000 == 0) {
             // slow down !
-            std::this_thread::sleep_for(std::chrono::milliseconds(30));
+            std::this_thread::sleep_for(std::chrono::milliseconds(15));
         }
     }
 }
@@ -146,8 +156,8 @@ int main() {
 
     CartridgeRomDevice rom(prg, 0xc000);
     RamDevice ram(0x0000);
-    PpuDevice ppu(chr, &ram);
     ApuDevice apu;
+    PpuDevice ppu(chr, &ram, &apu);
 
     Memory mem({
         {0x0000, &ram},
@@ -159,6 +169,7 @@ int main() {
 
     Emu6502 cpu(&mem, false, &lst);
     ppu.set_cpu(&cpu); // urgh
+    apu.set_cpu(&cpu); // urgh
 
 
     bool kill = false;

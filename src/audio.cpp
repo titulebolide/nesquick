@@ -32,6 +32,9 @@ void SoundEngine::start_sound() {
     m_sq1_cur_dur = 0;
     m_sq2_cur_dur = 0;
 
+    m_sq1_amplitude = AMPLITUDE/2;
+    m_sq2_amplitude = AMPLITUDE/2;
+
     // Start playing audio
     SDL_PauseAudio(0);
 }
@@ -41,16 +44,34 @@ SoundEngine::~SoundEngine()
     SDL_CloseAudio();
 }
 
-void SoundEngine::setFrequency1(float frequency, float duration)
-{
-    m_frequency_1 = frequency;
-    m_sq1_cur_dur = duration;
+void SoundEngine::setFrequency(int channel, float frequency, float duration)
+{   
+    switch (channel)
+    {
+    case 1:
+        m_frequency_2 = frequency;
+        m_sq2_cur_dur = duration;
+        break;
+    
+    default:
+        m_frequency_2 = frequency;
+        m_sq2_cur_dur = duration;
+        break;
+    }
 }
 
-void SoundEngine::setFrequency2(float frequency, float duration)
-{
-    m_frequency_2 = frequency;
-    m_sq2_cur_dur = duration;
+void SoundEngine::setAmplitude(int channel, float amplitude)
+{   
+    switch (channel)
+    {
+    case 1:
+        m_sq1_amplitude = amplitude;
+        break;
+    
+    default:
+        m_sq2_amplitude = amplitude;
+        break;
+    }
 }
 
 
@@ -65,7 +86,7 @@ void SoundEngine::generateSamples(Sint16 *stream, int length)
         }
         if (m_sq2_cur_dur > 0) {
             stream[i] += (AMPLITUDE/3) * (phase2 < M_PI ? 1:-1);
-            m_sq2_cur_dur -= SAMPLE_RATE_PEROOD;
+            m_sq2_cur_dur -= SAMPLE_RATE_PERIOD;
         }
         // if (phase_tri < M_PI) {
         //     stream[i] += (AMPLITUDE/6) * (2 * phase_tri / M_PI - 1) ;

@@ -2,8 +2,8 @@
 
 #include "ppu.hpp"
 
-PpuDevice::PpuDevice(uint8_t * _chr_rom, Device * cpu_ram) : 
-    cpu_ram(cpu_ram), cpu(nullptr), frame(30*8, 32*8, CV_8UC3) {
+PpuDevice::PpuDevice(uint8_t * _chr_rom, Device * cpu_ram, Device * apu) : 
+    cpu_ram(cpu_ram), cpu(nullptr), m_apu(apu), frame(30*8, 32*8, CV_8UC3) {
 
     for (uint16_t addr = 0; addr < 0x4000; addr ++) {
         chr_rom[addr] = _chr_rom[addr];
@@ -89,6 +89,10 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
             controller_read_no = 0;
         }
         break;
+
+    case KEY_CTRL2:
+        // this write corresponds to the APU set mode and interrupt...
+        m_apu->set(addr, value);
 
     default:
         break;
