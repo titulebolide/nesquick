@@ -35,7 +35,7 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
         m_square1.length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
 
         std::cout << "sq1: " << m_square1.period << " " << static_cast<int>(m_square1.length) << std::endl;
-        m_sound_engine.setFrequency(1, 1789773 /  (16.0f*( static_cast<float>(m_square1.period) + 1)), static_cast<float>(m_square1.length)/240.0f);
+        m_sound_engine.setFrequency(0, 1789773 /  (16.0f*( static_cast<float>(m_square1.period) + 1)), static_cast<float>(m_square1.length)/240.0f);
         break;
 
     case KEY_PULSE2_DUTY_ENVELOPE:
@@ -50,6 +50,9 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
         m_square2.length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
 
         std::cout << "sq2: " << m_square2.period << " " << static_cast<int>(m_square2.length) << std::endl;
+        m_sound_engine.setFrequency(1, 1789773 /  (16.0f*( static_cast<float>(m_square2.period) + 1)), static_cast<float>(m_square2.length)/240.0f);
+        break;
+
     case KEY_STATUS:
         // TODO : send 0 on powerup / reset
         // TODO : partially implemented
@@ -60,9 +63,12 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
     case KEY_SETMODE:
         m_enable_irq = ((value & BIT6) == 0); // BIT6 is IRQ inhibit
         m_sequencer_mode = ((value & BIT6) != 0); // 0 : 4 step, 1 : 5 steps
+        // writing here trigger the reset of the apu counter
+        // and call the quarter and half frame tick
         quarter_frame_tick();
         half_frame_tick();
         m_apu_cycle_count == 0;
+        break;
 
     default:
         break;
@@ -119,13 +125,21 @@ void ApuDevice::tick() {
 
 void ApuDevice::quarter_frame_tick() {
     // handle envelope
-    if (m_square1.constant_volume) {
-        std::cout << m_square1.volume << std::endl;
-        m_sound_engine.setAmplitude(1, static_cast<float>(m_square1.volume)/15*14000);
+    float amplitude1, amplitude2 = 0;
+    if (m_square1.enable) {
+        if (m_square1.constant_volume) {
+            std::cout << m_square1.volume << std::endl;
+            amplitude1 = static_cast<float>(m_square1.volume)/15*14000;
+        }
     }
-    if (m_square2.constant_volume) {
-        m_sound_engine.setAmplitude(2, static_cast<float>(m_square2.volume)/15*14000);
+    if (m_square2.enable) {
+        if (m_square2.constant_volume) {
+            amplitude2 = static_cast<float>(m_square2.volume)/15*14000;
+        }
     }
+    m_sound_engine.setAmplitude(0, amplitude1);
+    m_sound_engine.setAmplitude(1, amplitude2);
+
 }
 
 void ApuDevice::half_frame_tick() {

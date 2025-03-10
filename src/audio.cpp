@@ -22,18 +22,7 @@ void SoundEngine::start_sound() {
     }
 
     // Initialize phase and start time
-    phase1 = 0;
-    phase2 = 0;
     start_time = SDL_GetTicks();
-
-    m_frequency_1 = 400;
-    m_frequency_2 = 400;
-
-    m_sq1_cur_dur = 0;
-    m_sq2_cur_dur = 0;
-
-    m_sq1_amplitude = AMPLITUDE/2;
-    m_sq2_amplitude = AMPLITUDE/2;
 
     // Start playing audio
     SDL_PauseAudio(0);
@@ -44,64 +33,42 @@ SoundEngine::~SoundEngine()
     SDL_CloseAudio();
 }
 
+void SoundEngine::validateChannelNo(int channel) {
+    if (!(channel <= 1 && channel >= 0)) {
+        throw std::runtime_error("Bad channel number");
+    }
+}
+
 void SoundEngine::setFrequency(int channel, float frequency, float duration)
 {   
-    switch (channel)
-    {
-    case 1:
-        m_frequency_2 = frequency;
-        m_sq2_cur_dur = duration;
-        break;
-    
-    default:
-        m_frequency_2 = frequency;
-        m_sq2_cur_dur = duration;
-        break;
-    }
+    validateChannelNo(channel);
+    m_square[channel].frequency = frequency;
+    m_square[channel].left_duration = duration;
 }
 
 void SoundEngine::setAmplitude(int channel, float amplitude)
 {   
-    switch (channel)
-    {
-    case 1:
-        m_sq1_amplitude = amplitude;
-        break;
-    
-    default:
-        m_sq2_amplitude = amplitude;
-        break;
-    }
+    validateChannelNo(channel);
+    m_square[channel].amplitude = amplitude;
 }
-
 
 void SoundEngine::generateSamples(Sint16 *stream, int length)
 {
     for (int i = 0; i < length; i++) {
-        
         stream[i] = 0;
-        if (m_sq1_cur_dur > 0) {
-            stream[i] += (AMPLITUDE/3) * (phase1 < M_PI ? 1:-1);
-            m_sq1_cur_dur -= 1/SAMPLE_RATE;
-        }
-        if (m_sq2_cur_dur > 0) {
-            stream[i] += (AMPLITUDE/3) * (phase2 < M_PI ? 1:-1);
-            m_sq2_cur_dur -= SAMPLE_RATE_PERIOD;
-        }
-        // if (phase_tri < M_PI) {
-        //     stream[i] += (AMPLITUDE/6) * (2 * phase_tri / M_PI - 1) ;
-        // } else {
-        //     stream[i] += (AMPLITUDE/6) * (3 - 2 * phase_tri / M_PI);
-        // }
-        phase1 += 2 * M_PI * m_frequency_1 / SAMPLE_RATE;
-        phase2 += 2 * M_PI * m_frequency_2 / SAMPLE_RATE;
-
-        // Wrap phase to avoid overflow
-        if (phase1 > 2 * M_PI) {
-            phase1 -= 2 * M_PI;
-        }
-        if (phase2 > 2 * M_PI) {
-            phase2 -= 2 * M_PI;
+        for (int chan_no=0; chan_no < 2; chan_no++) {
+            squareWave * channel = &m_square[chan_no];
+            if (!(channel->enabled && channel->left_duration > 0)) {
+                continue;
+            }
+            stream[i] += channel->amplitude * (channel->current_phase < M_PI ? 1:-1);
+            channel->left_duration -= 1/SAMPLE_RATE;
+            // increase phase only if playing
+            channel->current_phase += 2 * M_PI * channel->frequency / SAMPLE_RATE;
+            // Wrap phase to avoid overflow
+            if (channel->current_phase > 2 * M_PI) {
+                channel->current_phase -= 2 * M_PI;
+            }
         }
     }
 }
