@@ -24,14 +24,16 @@ enum {
 
 struct squarePulse {
     uint16_t period = 0;
-    uint8_t length = 0;
-    uint8_t duty = 0;
+    uint8_t duty_cycle_no = 0;
+    float length = 0;
     bool constant_volume = false;
     uint8_t volume = 0; // volume to be used in constant volume mode
     bool enable = 0;
 };
 
 const long APU_FRAME_CYCLE_COUNT = 3728; // NTSC
+
+const float DUTY_CYCLE_VALUES[4] = {0.125, 0.25, 0.5, 0.75};
 
 enum {
     SEQUENCER_4STEP_MODE = 0,

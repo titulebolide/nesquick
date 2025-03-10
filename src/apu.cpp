@@ -6,7 +6,7 @@ ApuDevice::ApuDevice() {
 }
 
 void ApuDevice::start_sound() {
-    m_sound_engine.start_sound();
+    m_sound_engine.startSound();
 }
 
 void ApuDevice::set_cpu(Emu6502 * cpu) {
@@ -22,6 +22,8 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
 
     switch (addr) {
     case KEY_PULSE1_DUTY_ENVELOPE:
+        m_square1.duty_cycle_no = value >> 6;
+        m_sound_engine.setDutyCycle(0, DUTY_CYCLE_VALUES[m_square1.duty_cycle_no]);
         m_square1.volume = value & 0b1111;
         m_square1.constant_volume = ((value & BIT4) != 0);
         break;
@@ -33,12 +35,18 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
     case KEY_PULSE1_PERIOD_HIGH:
         m_square1.period = (static_cast<uint16_t>(value & 0b111) << 8) | (m_square1.period & 0x00ff);
         m_square1.length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
-
-        std::cout << "sq1: " << m_square1.period << " " << static_cast<int>(m_square1.length) << std::endl;
-        m_sound_engine.setFrequency(0, 1789773 /  (16.0f*( static_cast<float>(m_square1.period) + 1)), static_cast<float>(m_square1.length)/240.0f);
+        m_sound_engine.setFrequency(
+            0, 
+            1789773 /  (16.0f*( static_cast<float>(m_square1.period) + 1)), 
+            m_square1.length / 240.0f
+        );
         break;
 
     case KEY_PULSE2_DUTY_ENVELOPE:
+        m_square1.duty_cycle_no = value >> 6;
+        m_sound_engine.setDutyCycle(1, DUTY_CYCLE_VALUES[m_square1.duty_cycle_no]);
+        m_square2.volume = value & 0b1111;
+        m_square2.constant_volume = ((value & BIT4) != 0);
         break;
     
     case KEY_PULSE2_PERIOD_LOW:
@@ -48,16 +56,18 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
     case KEY_PULSE2_PERIOD_HIGH:
         m_square2.period = (static_cast<uint16_t>(value & 0b111) << 8) | (m_square2.period & 0x00ff);
         m_square2.length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
-
-        std::cout << "sq2: " << m_square2.period << " " << static_cast<int>(m_square2.length) << std::endl;
-        m_sound_engine.setFrequency(1, 1789773 /  (16.0f*( static_cast<float>(m_square2.period) + 1)), static_cast<float>(m_square2.length)/240.0f);
+        m_sound_engine.setFrequency(
+            1, 
+            1789773 /  (16.0f*( static_cast<float>(m_square2.period) + 1)), 
+            m_square2.length / 240.0f
+        );
         break;
 
     case KEY_STATUS:
         // TODO : send 0 on powerup / reset
         // TODO : partially implemented
-        m_square1.enable = ((value & BIT0) != 0);
-        m_square2.enable = ((value & BIT1) != 0);
+        m_sound_engine.setChannelEnable(0, (value & BIT0) != 0);
+        m_sound_engine.setChannelEnable(1, (value & BIT1) != 0);
         break;
 
     case KEY_SETMODE:

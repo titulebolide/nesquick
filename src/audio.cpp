@@ -4,7 +4,7 @@ void audio_callback(void*, Uint8*, int);
 
 SoundEngine::SoundEngine() {}
 
-void SoundEngine::start_sound() {
+void SoundEngine::startSound() {
     SDL_AudioSpec desiredSpec;
 
     desiredSpec.freq = SAMPLE_RATE;
@@ -52,6 +52,18 @@ void SoundEngine::setAmplitude(int channel, float amplitude)
     m_square[channel].amplitude = amplitude;
 }
 
+void SoundEngine::setDutyCycle(int channel, float duty_cycle)
+{   
+    validateChannelNo(channel);
+    m_square[channel].duty_cycle = duty_cycle;
+}
+
+void SoundEngine::setChannelEnable(int channel, float enable)
+{   
+    validateChannelNo(channel);
+    m_square[channel].enabled = enable;
+}
+
 void SoundEngine::generateSamples(Sint16 *stream, int length)
 {
     for (int i = 0; i < length; i++) {
@@ -61,7 +73,7 @@ void SoundEngine::generateSamples(Sint16 *stream, int length)
             if (!(channel->enabled && channel->left_duration > 0)) {
                 continue;
             }
-            stream[i] += channel->amplitude * (channel->current_phase < M_PI ? 1:-1);
+            stream[i] += channel->amplitude * (channel->current_phase < 2 * M_PI * channel->duty_cycle ? 1:-1);
             channel->left_duration -= 1/SAMPLE_RATE;
             // increase phase only if playing
             channel->current_phase += 2 * M_PI * channel->frequency / SAMPLE_RATE;

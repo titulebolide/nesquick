@@ -22,7 +22,7 @@ struct squareWave {
     float left_duration = 0;
     float amplitude = AMPLITUDE/2; // TODO : try setting at 0 the init amplitude
     double current_phase = 0; // Tracks the phase of the wave
-    int duty_cycle = PULSE_DUTY_50;
+    float duty_cycle = 0.5;
     bool enabled = false;
 };
 
@@ -32,13 +32,15 @@ private:
     Uint32 start_time;  // Tracks the start time for modulation
     squareWave m_square[2];
     void validateChannelNo(int channel);
+    float getWave(float phase, int duty_cycle);
 
 public:
     SoundEngine();
     ~SoundEngine();
-    void start_sound();
+    void startSound();
     void setFrequency(int channel, float frequency, float duration);
     void setAmplitude(int channel, float amplitude);
-    void setDutyCycle(int duty_cycle);
+    void setDutyCycle(int channel, float duty_cycle);
+    void setChannelEnable(int channel, float enable);
     void generateSamples(Sint16 *stream, int length);
 };
