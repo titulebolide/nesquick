@@ -90,6 +90,9 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
         }
         break;
 
+    case KEY_APU_STATUS:
+        m_apu->set(addr, value);
+
     case KEY_CTRL2:
         // this write corresponds to the APU set mode and interrupt...
         m_apu->set(addr, value);

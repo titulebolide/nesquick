@@ -50,7 +50,11 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
         m_square2.length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
 
         std::cout << "sq2: " << m_square2.period << " " << static_cast<int>(m_square2.length) << std::endl;
-        m_sound_engine.setFrequency(2, 1789773 /  (16.0f*( static_cast<float>(m_square2.period) + 1)), static_cast<float>(m_square2.length)/240.0f);
+    case KEY_STATUS:
+        // TODO : send 0 on powerup / reset
+        // TODO : partially implemented
+        m_square1.enable = ((value & BIT0) != 0);
+        m_square2.enable = ((value & BIT1) != 0);
         break;
 
     case KEY_SETMODE:

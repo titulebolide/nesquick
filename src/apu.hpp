@@ -15,7 +15,11 @@ enum {
     KEY_TRI_PERIOD_LOW = 0x400A,
     KEY_TRI_PERIOD_HIGH = 0x400B,
 
-    KEY_SETMODE = 0x4017, // forwarded by the PPU
+    // PPU starts at 0x4014
+    // From here it is forwarded manually from the PPU
+
+    KEY_STATUS = 0x4015,
+    KEY_SETMODE = 0x4017,
 };
 
 struct squarePulse {
@@ -24,6 +28,7 @@ struct squarePulse {
     uint8_t duty = 0;
     bool constant_volume = false;
     uint8_t volume = 0; // volume to be used in constant volume mode
+    bool enable = 0;
 };
 
 const long APU_FRAME_CYCLE_COUNT = 3728; // NTSC
