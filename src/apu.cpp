@@ -22,44 +22,59 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
 
     switch (addr) {
     case KEY_PULSE1_DUTY_ENVELOPE:
-        m_square1.duty_cycle_no = value >> 6;
-        m_sound_engine.setDutyCycle(0, DUTY_CYCLE_VALUES[m_square1.duty_cycle_no]);
-        m_square1.volume = value & 0b1111;
-        m_square1.constant_volume = ((value & BIT4) != 0);
+        m_square[0].duty_cycle_no = value >> 6;
+        m_sound_engine.setDutyCycle(0, DUTY_CYCLE_VALUES[m_square[0].duty_cycle_no]);
+        m_square[0].constant_volume = ((value & BIT4) != 0);
+        if (m_square[0].constant_volume) {
+            m_square[0].volume = value & 0b1111;
+            m_square[0].envolope_decay_speed = 0;
+        } else {
+            m_square[0].volume = 15;
+            m_square[0].envolope_decay_speed = value & 0b1111;
+            m_square[0].decay_counter = m_square[0].envolope_decay_speed;
+
+        }
         break;
 
     case KEY_PULSE1_PERIOD_LOW:
-        m_square1.period = (m_square1.period & 0xff00) | static_cast<uint16_t>(value);
+        m_square[0].period = (m_square[0].period & 0xff00) | static_cast<uint16_t>(value);
         break;
     
     case KEY_PULSE1_PERIOD_HIGH:
-        m_square1.period = (static_cast<uint16_t>(value & 0b111) << 8) | (m_square1.period & 0x00ff);
-        m_square1.length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
+        m_square[0].period = (static_cast<uint16_t>(value & 0b111) << 8) | (m_square[0].period & 0x00ff);
+        m_square[0].length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
         m_sound_engine.setFrequency(
             0, 
-            1789773 /  (16.0f*( static_cast<float>(m_square1.period) + 1)), 
-            m_square1.length / 240.0f
+            1789773 /  (16.0f*( static_cast<float>(m_square[0].period) + 1)), 
+            m_square[0].length / 240.0f
         );
         break;
 
     case KEY_PULSE2_DUTY_ENVELOPE:
-        m_square1.duty_cycle_no = value >> 6;
-        m_sound_engine.setDutyCycle(1, DUTY_CYCLE_VALUES[m_square1.duty_cycle_no]);
-        m_square2.volume = value & 0b1111;
-        m_square2.constant_volume = ((value & BIT4) != 0);
+        m_square[1].duty_cycle_no = value >> 6;
+        m_sound_engine.setDutyCycle(1, DUTY_CYCLE_VALUES[m_square[1].duty_cycle_no]);
+        m_square[1].constant_volume = ((value & BIT4) != 0);
+        if (m_square[1].constant_volume) {
+            m_square[1].volume = value & 0b1111;
+            m_square[1].envolope_decay_speed = 0;
+        } else {
+            m_square[1].volume = 15;
+            m_square[1].envolope_decay_speed = value & 0b1111;
+            m_square[1].decay_counter = m_square[1].envolope_decay_speed;
+        }
         break;
     
     case KEY_PULSE2_PERIOD_LOW:
-        m_square2.period = (m_square2.period & 0xff00) | static_cast<uint16_t>(value);
+        m_square[1].period = (m_square[1].period & 0xff00) | static_cast<uint16_t>(value);
         break;
     
     case KEY_PULSE2_PERIOD_HIGH:
-        m_square2.period = (static_cast<uint16_t>(value & 0b111) << 8) | (m_square2.period & 0x00ff);
-        m_square2.length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
+        m_square[1].period = (static_cast<uint16_t>(value & 0b111) << 8) | (m_square[1].period & 0x00ff);
+        m_square[1].length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
         m_sound_engine.setFrequency(
             1, 
-            1789773 /  (16.0f*( static_cast<float>(m_square2.period) + 1)), 
-            m_square2.length / 240.0f
+            1789773 /  (16.0f*( static_cast<float>(m_square[1].period) + 1)), 
+            m_square[1].length / 240.0f
         );
         break;
 
@@ -70,7 +85,7 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
     case KEY_TRI_PERIOD_HIGH:
         m_triangle.period = (static_cast<uint16_t>(value & 0b111) << 8) | (m_triangle.period & 0x00ff);
         m_triangle.length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
-        m_sound_engine.setFrequency(2, 1789773 / (16.0f*( static_cast<float>(m_square2.period) + 1)) / 2, m_square2.length / 240.0f);
+        m_sound_engine.setFrequency(2, 1789773 / (16.0f*( static_cast<float>(m_square[1].period) + 1)) / 2, m_square[1].length / 240.0f);
         break;
 
     case KEY_STATUS:
@@ -102,22 +117,22 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
 void ApuDevice::tick() {
     m_apu_cycle_count++;
     if (m_apu_cycle_count % APU_FRAME_CYCLE_COUNT == 0) {
-        if (m_apu_cycle_count = APU_FRAME_CYCLE_COUNT) {
+        if (m_apu_cycle_count == APU_FRAME_CYCLE_COUNT) {
             // step 1
             quarter_frame_tick();
-        } else if (m_apu_cycle_count = 2*APU_FRAME_CYCLE_COUNT) {
+        } else if (m_apu_cycle_count == 2*APU_FRAME_CYCLE_COUNT) {
             // step 2
             quarter_frame_tick();
             half_frame_tick();
 
-        } else if (m_apu_cycle_count = 3*APU_FRAME_CYCLE_COUNT) {
+        } else if (m_apu_cycle_count == 3*APU_FRAME_CYCLE_COUNT) {
             // step 3
             // We run this step at cycle count 11184 but apparently
             // it runs normally at 11185
             // it probably don't matter
             quarter_frame_tick();
 
-        } else if (m_apu_cycle_count = APU_FRAME_CYCLE_COUNT) {
+        } else if (m_apu_cycle_count == 4*APU_FRAME_CYCLE_COUNT) {
             // step 4
             // We run this step at cycle count 14912 but apparently
             // it runs normally at 14914
@@ -128,16 +143,18 @@ void ApuDevice::tick() {
             }
             quarter_frame_tick();
             half_frame_tick();
-            m_apu_cycle_count == 0;
+            full_frame_tick();
+            m_apu_cycle_count = 0;
 
-        } else if (m_apu_cycle_count = APU_FRAME_CYCLE_COUNT) {
+        } else if (m_apu_cycle_count == 5*APU_FRAME_CYCLE_COUNT) {
             // step 5
             // runs at the right cycle count for this one
             // necessarily in 5 steps mode here because it has not been
             // reset on step 4
             quarter_frame_tick();
             half_frame_tick();
-            m_apu_cycle_count == 0;
+            full_frame_tick();
+            m_apu_cycle_count = 0;
 
         }
     }

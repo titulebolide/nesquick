@@ -61,11 +61,10 @@ class ApuDevice : public Device {
     void quarter_frame_tick();
     void half_frame_tick();
 
- private:
+private:
     // TODO : needed to call IRQ, bu can do better than this
     Emu6502 * m_cpu;
-    squarePulse m_square1;
-    squarePulse m_square2;
+    squarePulse m_square[2];
     trianglePulse m_triangle;
 
     // set by 0x4017
