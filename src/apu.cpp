@@ -19,6 +19,7 @@ uint8_t ApuDevice::get(uint16_t addr) {
 
 void ApuDevice::set(uint16_t addr , uint8_t value) {
     uint8_t retval;
+    float dur, freq;
 
     switch (addr) {
     case KEY_PULSE1_DUTY_ENVELOPE:
@@ -32,6 +33,7 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
             m_square[0].volume = 15;
             m_square[0].envolope_decay_speed = value & 0b1111;
             m_square[0].decay_counter = m_square[0].envolope_decay_speed;
+            m_sound_engine.setAmplitude(0, MAX_AMPLITUDE); // init amplitude
 
         }
         break;
@@ -45,7 +47,7 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
         m_square[0].length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
         m_sound_engine.setFrequency(
             0, 
-            1789773 /  (16.0f*( static_cast<float>(m_square[0].period) + 1)), 
+            CLOCK_FREQUENCY / (16.0f*( static_cast<float>(m_square[0].period) + 1)), 
             m_square[0].length / 240.0f
         );
         break;
@@ -61,6 +63,7 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
             m_square[1].volume = 15;
             m_square[1].envolope_decay_speed = value & 0b1111;
             m_square[1].decay_counter = m_square[1].envolope_decay_speed;
+            m_sound_engine.setAmplitude(1, MAX_AMPLITUDE); // init amplitude
         }
         break;
     
@@ -73,7 +76,7 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
         m_square[1].length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
         m_sound_engine.setFrequency(
             1, 
-            1789773 /  (16.0f*( static_cast<float>(m_square[1].period) + 1)), 
+            CLOCK_FREQUENCY /  (16.0f*( static_cast<float>(m_square[1].period) + 1)), 
             m_square[1].length / 240.0f
         );
         break;
@@ -84,8 +87,12 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
 
     case KEY_TRI_PERIOD_HIGH:
         m_triangle.period = (static_cast<uint16_t>(value & 0b111) << 8) | (m_triangle.period & 0x00ff);
+
         m_triangle.length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
-        m_sound_engine.setFrequency(2, 1789773 / (16.0f*( static_cast<float>(m_square[1].period) + 1)) / 2, m_square[1].length / 240.0f);
+        freq = CLOCK_FREQUENCY / 2.0f / (16.0f*( static_cast<float>(m_triangle.period) + 1));
+        dur = m_triangle.length / 6.0f / 240.0f; // why 6 ?
+        dur = static_cast<float>(static_cast<int>(dur*freq)/freq); // round duration to a multiple of the period, to prevent popping when ending the sound
+        m_sound_engine.setFrequency(2, freq, dur); 
         break;
 
     case KEY_STATUS:
@@ -174,7 +181,6 @@ void ApuDevice::quarter_frame_tick() {
             }
         }
     }
-    // std::cout << static_cast<int>(m_square[0].volume) << std::endl;
 }
 
 void ApuDevice::half_frame_tick() {
