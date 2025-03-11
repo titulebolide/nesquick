@@ -168,8 +168,8 @@ void ApuDevice::quarter_frame_tick() {
                 square->decay_counter--;
             }
             if (square->decay_counter == 0) {
-                m_sound_engine.setAmplitude(chan_no, static_cast<float>(square->volume)/15*9000);
                 square->volume--; // testted in the upper if that it was non zero
+                m_sound_engine.setAmplitude(chan_no, static_cast<float>(square->volume)/15*MAX_AMPLITUDE);
                 square->decay_counter = square->envolope_decay_speed;
             }
         }

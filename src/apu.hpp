@@ -38,7 +38,8 @@ struct trianglePulse {
     float length = 0;
 };
 
-
+static int const CLOCK_FREQUENCY = 1789773;
+static int const MAX_AMPLITUDE = 4000;
 const long APU_FRAME_CYCLE_COUNT = 3728; // NTSC
 
 const float DUTY_CYCLE_VALUES[4] = {0.125, 0.25, 0.5, 0.75};
