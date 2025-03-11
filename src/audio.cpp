@@ -2,7 +2,9 @@
 
 void audio_callback(void*, Uint8*, int);
 
-SoundEngine::SoundEngine() {}
+SoundEngine::SoundEngine() {
+    m_square[2].current_phase = M_PI/2.0f; // set init phase of tri wave so that the sound wave starts at 0
+}
 
 void SoundEngine::startSound() {
     SDL_AudioSpec desiredSpec;
@@ -89,10 +91,12 @@ void SoundEngine::generateSamples(Sint16 *stream, int length)
 
         if ((channel->enabled && channel->left_duration > 0)) {
             if (channel->current_phase < M_PI) {
-                stream[i] += channel->amplitude * (channel->current_phase/M_PI*2 - 1);
+                stream[i] += 2*channel->amplitude * (channel->current_phase/M_PI*2 - 1);
             } else {
-                stream[i] += channel->amplitude * (3 - channel->current_phase/M_PI*2);
+                stream[i] += 2*channel->amplitude * (3 - channel->current_phase/M_PI*2);
             }
+        } else {
+            channel->current_phase = M_PI/2.0f; // resets phase so that we start at 0
         }
         channel->left_duration -= 1.0f/SAMPLE_RATE;
         // increase phase only if playing
