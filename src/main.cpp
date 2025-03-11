@@ -19,6 +19,11 @@
 #include <signal.h>
 #include <map>
 
+typedef std::chrono::high_resolution_clock Clock;
+
+static int const NSTEPS_PAUSE = 40000;
+static long const TIME_BETWEEN_PAUSE_US = (double)NSTEPS_PAUSE * 1000000.0f /(double)CLOCK_FREQUENCY * 2;
+
 std::map<char,uint8_t> CONTROLLER_MAPPING = {{'p', 0}, {'o', 1}, {'b', 2}, {'n', 3}, {'z', 4}, {'s', 5}, {'q', 6}, {'d', 7}}; // A, B, Select, Start, Up, Down, Left, Right
 
 void turn_bit_off(uint8_t * value, uint8_t bit) {
@@ -123,6 +128,7 @@ void ui(PpuDevice * ppu, ApuDevice * apu) {
 
 void run(Emu6502 * cpu, PpuDevice * ppu, ApuDevice * apu, bool * thread_done) {
     unsigned long long loopCount = 0;
+    auto last_t = Clock::now();
     while (!(*thread_done)) {
         cpu->tick();
 
@@ -140,9 +146,17 @@ void run(Emu6502 * cpu, PpuDevice * ppu, ApuDevice * apu, bool * thread_done) {
     
         loopCount++;
 
-        if (loopCount % 100000 == 0) {
+        if (loopCount % NSTEPS_PAUSE == 0) {
+            auto now = Clock::now();
             // slow down !
-            std::this_thread::sleep_for(std::chrono::milliseconds(15));
+            loopCount = 0;
+            long elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(now - last_t).count();
+            if (elapsed_time > TIME_BETWEEN_PAUSE_US) {
+                
+            }
+            // std::cout << TIME_BETWEEN_PAUSE_US - elapsed_time << " " << TIME_BETWEEN_PAUSE_US << " " << elapsed_time << std::endl;
+            std::this_thread::sleep_for(std::chrono::microseconds(TIME_BETWEEN_PAUSE_US - elapsed_time));
+            last_t = Clock::now();
         }
     }
 }
