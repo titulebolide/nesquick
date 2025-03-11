@@ -143,7 +143,6 @@ void ApuDevice::tick() {
             }
             quarter_frame_tick();
             half_frame_tick();
-            full_frame_tick();
             m_apu_cycle_count = 0;
 
         } else if (m_apu_cycle_count == 5*APU_FRAME_CYCLE_COUNT) {
@@ -153,7 +152,6 @@ void ApuDevice::tick() {
             // reset on step 4
             quarter_frame_tick();
             half_frame_tick();
-            full_frame_tick();
             m_apu_cycle_count = 0;
 
         }
@@ -163,18 +161,21 @@ void ApuDevice::tick() {
 
 void ApuDevice::quarter_frame_tick() {
     // handle envelope
-    float amplitude1, amplitude2 = 0;
-    if (m_square1.constant_volume) {
-        amplitude1 = static_cast<float>(m_square1.volume)/15*14000;
+    for (int chan_no=0; chan_no < 2; chan_no++) {
+        squarePulse * square = &m_square[chan_no];
+        if (!square->constant_volume && square->volume > 0) {
+            if (square->decay_counter > 0) {
+                square->decay_counter--;
+            }
+            if (square->decay_counter == 0) {
+                m_sound_engine.setAmplitude(chan_no, static_cast<float>(square->volume)/15*9000);
+                square->volume--; // testted in the upper if that it was non zero
+                square->decay_counter = square->envolope_decay_speed;
+            }
+        }
     }
-    if (m_square2.constant_volume) {
-        amplitude2 = static_cast<float>(m_square2.volume)/15*14000;
-    }
-    // m_sound_engine.setAmplitude(0, amplitude1);
-    // m_sound_engine.setAmplitude(1, amplitude2);
-
+    // std::cout << static_cast<int>(m_square[0].volume) << std::endl;
 }
 
 void ApuDevice::half_frame_tick() {
-    
 }

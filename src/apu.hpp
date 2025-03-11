@@ -28,6 +28,8 @@ struct squarePulse {
     float length = 0;
     bool constant_volume = false;
     uint8_t volume = 0; // volume to be used in constant volume mode
+    uint8_t envolope_decay_speed = 0;
+    uint8_t decay_counter = 0;
     bool enable = 0;
 };
 
