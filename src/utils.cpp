@@ -56,7 +56,7 @@ std::string hexstr(uint16_t value) {
     return ss.str();
 }
 
-void parseInes(const std::string& filename, uint8_t * prg, uint8_t * chr) {
+void parseInes(const std::string& filename, uint8_t * prg, uint8_t * chr, uint16_t * prgLen, uint16_t * chrLen) {
     std::ifstream file(filename, std::ios::binary);
     if (!file) {
         throw std::runtime_error("Unable to open file");
@@ -69,16 +69,16 @@ void parseInes(const std::string& filename, uint8_t * prg, uint8_t * chr) {
     }
 
     std::vector<uint8_t> header(data.begin(), data.begin() + 16);
-    int prgLen = header[4] * 16384;
-    int chrLen = header[5] * 8192;
+    *prgLen = header[4] * 16384;
+    *chrLen = header[5] * 8192;
 
-    if (data.size() != chrLen + prgLen + 16) {
+    if (data.size() != *chrLen + *prgLen + 16) {
         throw std::runtime_error("Unsupported file format");
     }
-    for (int addr = 0; addr < prgLen; addr ++) {
+    for (int addr = 0; addr < *prgLen; addr ++) {
         prg[addr] = data[16 + addr];
     }
-    for (int addr = 0; addr < chrLen; addr ++) {
-        chr[addr] = data[16 + prgLen + addr];
+    for (int addr = 0; addr < *chrLen; addr ++) {
+        chr[addr] = data[16 + *prgLen + addr];
     }
 }

@@ -57,7 +57,7 @@ void ui(PpuDevice * ppu, ApuDevice * apu) {
         return;
     }
 
-    SDL_Window* window = SDL_CreateWindow("Display Image", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 32*8*2, 30*8*2, SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_INPUT_FOCUS);
+    SDL_Window* window = SDL_CreateWindow("Display Image", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 32*8*3, 30*8*3, SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_INPUT_FOCUS);
     if (window == nullptr) {
         std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
         SDL_Quit();
@@ -164,11 +164,14 @@ void run(Emu6502 * cpu, PpuDevice * ppu, ApuDevice * apu, bool * thread_done) {
 int main() {
     uint8_t prg[0x8000] = {0};
     uint8_t chr[0x4000] = {0}; // TODO : check sizes
+    uint16_t prgLen, chrLen;
 
-    parseInes("../rom/Donkey-Kong-NES-Disassembly/dk.nes", prg, chr);
-    LstDebuggerAsm6 lst("../rom/Donkey-Kong-NES-Disassembly/dk.lst", true);
+    parseInes("../rom/smb1/bin/smb1.nes", prg, chr, &prgLen, &chrLen);
+    LstDebuggerAsm6 lst("../rom/smb1/bin/smb1.lst", true);
 
-    CartridgeRomDevice rom(prg, 0xc000);
+    uint16_t rom_base_addr = 0x10000 - prgLen;
+
+    CartridgeRomDevice rom(prg, rom_base_addr);
     RamDevice ram(0x0000);
     ApuDevice apu;
     PpuDevice ppu(chr, &ram, &apu);
@@ -178,7 +181,7 @@ int main() {
         {0x2000, &ppu},
         {0x4000, &apu},
         {0x4014, &ppu},
-        {0xc000, &rom},
+        {rom_base_addr, &rom},
     });
 
     Emu6502 cpu(&mem, false, &lst);
