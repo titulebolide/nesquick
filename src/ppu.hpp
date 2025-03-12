@@ -36,33 +36,33 @@ const uint8_t NES_COLORS[64][3] = {{124, 124, 124}, {0, 0, 252}, {0, 0, 188}, {6
 
 class PpuDevice : public Device {
 private:
-    uint8_t chr_rom[0x4000];
+    uint8_t m_chr_rom[0x4000];
 
     // TODO : this is quite bad, we share here cpuram for OAMDMA
-    Device * cpu_ram;
+    Device * m_cpu_ram;
     // Same, needed to forward 4017 writes...
     Device * m_apu;
     // this is used to call the interrupt, same, could do better (interface ?)
-    Emu6502 * cpu;
+    Emu6502 * m_cpu;
 
     // cpu_interrupt = None
     // cpu_ram = None
 
-    uint8_t vram[0x4000] = {0}; // 14 bit addr space
-    long ntick = 0;
-    uint8_t ppu_reg_w = 0;
-    uint16_t ppuaddr = 0;
-    uint8_t ppuctrl = 0;
-    uint8_t ppustatus = 0;
-    uint8_t ppuoam[256] = {0};
-    uint8_t ppudata_buffer = 0; // ppudata does not read directly ram but a buffer that is updated after each read
+    uint8_t m_vram[0x4000] = {0}; // 14 bit addr space
+    long m_ntick = 0;
+    uint8_t m_ppu_reg_w = 0;
+    uint16_t m_ppuaddr = 0;
+    uint8_t m_ppuctrl = 0;
+    uint8_t m_ppustatus = 0;
+    uint8_t m_ppuoam[256] = {0};
+    uint8_t m_ppudata_buffer = 0; // ppudata does not read directly ram but a buffer that is updated after each read
 
-    uint8_t controller_strobe = 0;
-    uint8_t controller_read_no = 0;
+    uint8_t m_controller_strobe = 0;
+    uint8_t m_controller_read_no = 0;
 
     uint8_t m_kb_state = 0;
     
-    cv::Mat frame;
+    cv::Mat m_frame;
     
     bool get_ppuctrl_bit(uint8_t status_bit);
 
