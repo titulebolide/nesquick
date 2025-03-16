@@ -111,7 +111,7 @@ void ui(PpuDevice * ppu, ApuDevice * apu) {
         }
 
         ppu->set_kb_state(kb_state);
-        ppu->render();
+        // ppu->render();
 
         SDL_UpdateTexture(texture, nullptr, frame->data, frame->step1());
         SDL_RenderClear(renderer);
@@ -166,8 +166,14 @@ int main() {
     uint8_t chr[0x4000] = {0}; // TODO : check sizes
     uint16_t prgLen, chrLen;
 
-    parseInes("../rom/smb1/bin/smb1.nes", prg, chr, &prgLen, &chrLen);
-    LstDebuggerAsm6 lst("../rom/smb1/bin/smb1.lst", true);
+    // parseInes("../rom/Donkey-Kong-NES-Disassembly/dk.nes", prg, chr, &prgLen, &chrLen);
+    // LstDebuggerAsm6 lst("../rom/Donkey-Kong-NES-Disassembly/dk.lst", true);
+
+    parseInes("/home/titus/dev/nesquick/rom/smb1/bin/smb1.nes", prg, chr, &prgLen, &chrLen);
+    LstDebuggerAsm6 lst("/home/titus/dev/nesquick/rom/smb1/bin/smb1.lst", true);
+
+    // parseInes("/home/titus/dev/nesquick/rom/pacman.nes", prg, chr, &prgLen, &chrLen);
+
 
     uint16_t rom_base_addr = 0x10000 - prgLen;
 
@@ -184,7 +190,7 @@ int main() {
         {rom_base_addr, &rom},
     });
 
-    Emu6502 cpu(&mem, false, &lst);
+    Emu6502 cpu(&mem, false); //, &lst);
     ppu.set_cpu(&cpu); // urgh
     apu.set_cpu(&cpu); // urgh
 

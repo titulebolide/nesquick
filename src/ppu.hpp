@@ -35,6 +35,9 @@ static const uint8_t PPUSTATUS_SPRITE0_COLLISION = BIT6;
 
 const uint8_t NES_COLORS[64][3] = {{124, 124, 124}, {0, 0, 252}, {0, 0, 188}, {68, 40, 188}, {148, 0, 132}, {168, 0, 32}, {168, 16, 0}, {136, 20, 0}, {80, 48, 0}, {0, 120, 0}, {0, 104, 0}, {0, 88, 0}, {0, 64, 88}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {188, 188, 188}, {0, 120, 248}, {0, 88, 248}, {104, 68, 252}, {216, 0, 204}, {228, 0, 88}, {248, 56, 0}, {228, 92, 16}, {172, 124, 0}, {0, 184, 0}, {0, 168, 0}, {0, 168, 68}, {0, 136, 136}, {0, 0, 0}, {0, 0, 0}, {0, 0, 0}, {248, 248, 248}, {60, 188, 252}, {104, 136, 252}, {152, 120, 248}, {248, 120, 248}, {248, 88, 152}, {248, 120, 88}, {252, 160, 68}, {248, 184, 0}, {184, 248, 24}, {88, 216, 84}, {88, 248, 152}, {0, 232, 216}, {120, 120, 120}, {0, 0, 0}, {0, 0, 0}, {252, 252, 252}, {164, 228, 252}, {184, 184, 248}, {216, 184, 248}, {248, 184, 248}, {248, 164, 192}, {240, 208, 176}, {252, 224, 168}, {248, 216, 120}, {216, 248, 120}, {184, 248, 184}, {184, 248, 216}, {0, 252, 252}, {248, 216, 248}, {0, 0, 0}, {0, 0, 0}};
 
+const uint16_t SCANLINE_LENGHT = 341;
+const uint16_t SCANLINE_NUMBER = 262;
+const uint16_t SCANLINE_VBLANK_START = 241;
 
 class PpuDevice : public Device {
 private:
@@ -51,7 +54,7 @@ private:
     // cpu_ram = None
 
     uint8_t m_vram[0x4000] = {0}; // 14 bit addr space
-    long m_ntick = 0;
+    uint32_t m_ntick = 0;
     uint8_t m_ppu_reg_w = 0;
     uint16_t m_ppuaddr = 0;
     uint8_t m_ppuctrl = 0;
@@ -59,28 +62,34 @@ private:
     uint8_t m_ppuoam[256] = {0};
     uint8_t m_ppudata_buffer = 0; // ppudata does not read directly ram but a buffer that is updated after each read
 
+    uint8_t m_ppuscroll_x = 0;
+    uint8_t m_ppuscroll_y = 0;
+
     uint8_t m_controller_strobe = 0;
     uint8_t m_controller_read_no = 0;
 
     uint8_t m_kb_state = 0;
     
-    cv::Mat m_frame;
+    cv::Mat m_next_frame; // frame that we are building
+    cv::Mat m_last_frame; // last frame that we built
+
     
     bool get_ppuctrl_bit(uint8_t status_bit);
 
     void inc_ppuaddr();
-    void render_oam(cv::Mat * frame);
-    void render_nametable(cv::Mat * frame);
-    bool add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, uint8_t sprite_x, uint8_t sprite_y, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision);
+    bool add_sprite(uint8_t sprite_no, bool table_no, uint8_t sprite_x, uint8_t sprite_y, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision);
     void get_sprite(uint8_t sprite[8][8], uint8_t sprite_no, bool table_no, bool doubletile);
-
- public:
+    
+public:
+    void render_oam();
+    void render_nametable_line(uint8_t screen_sprite_y);
     PpuDevice(uint8_t * chr_rom, Device * cpu_ram, Device * apu);
     uint8_t get(uint16_t addr);
     void set(uint16_t addr, uint8_t val);
     void tick();
-    void set_cpu(Emu6502 * cpu);
+    void set_cpu(Emu6502 *cpu);
     void set_kb_state(uint8_t kb_state);
     void render();
     cv::Mat *getFrame();
+    void saveFrame();
 };
