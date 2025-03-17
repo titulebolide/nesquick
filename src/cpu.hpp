@@ -66,6 +66,7 @@ public:
     void interrupt(bool maskable);
     void op_reset();
     bool tick();
+    void setDebug(bool debug);
 
 private:
     void set_status_bit(uint8_t status_bit, bool on);
@@ -169,7 +170,7 @@ private:
 
 
 private:
-    bool debug;
+    bool m_debug;
     // TODO : either move this to an struct or to a uint8_t regs[4]
     // TODO : all the checks that regs[smth] > 255 are broken because it is an uint8_t
     // TODO : We have to find another way to detect a carry !
@@ -196,8 +197,8 @@ private:
 
 
     void check_opcode_map();
-    uint16_t get_addr(int mode, bool * page_crossed);
-    
+    uint16_t get_addr(int mode, bool *page_crossed);
+
     std::map<uint16_t, Opcode> opcodes {
         // INTERRUPTS
         {OPCODE_IRQ, {&Emu6502::op_irq, IMPLICIT, 0, 7, NOEC}},

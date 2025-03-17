@@ -11,7 +11,7 @@
 #include "cpu.hpp"
 
 Emu6502::Emu6502(Memory *mem, bool debug, LstDebuggerAsm6 *lst)
-    : debug(debug), mem(mem), lst(lst) {
+    : m_debug(debug), mem(mem), lst(lst) {
     regs = {0, 0, 0, 0};
     stack_ptr = 0xff;
     prgm_ctr = 0;
@@ -22,6 +22,9 @@ Emu6502::Emu6502(Memory *mem, bool debug, LstDebuggerAsm6 *lst)
     check_opcode_map();
 }
 
+void Emu6502::setDebug(bool debug) {
+    m_debug = debug;
+}
 
 void Emu6502::check_opcode_map() {
     for (const auto& pair : opcodes) {
@@ -441,7 +444,7 @@ void Emu6502::op_reset() {
 }
 
 int Emu6502::exec_inst() {
-    if (debug) {
+    if (m_debug) {
         dbg();
     }
 

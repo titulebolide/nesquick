@@ -35,7 +35,7 @@ void turn_bit_on(uint8_t * value, uint8_t bit) {
 }
 
 
-void ui(PpuDevice * ppu, ApuDevice * apu) {
+void ui(Emu6502 * cpu, PpuDevice * ppu, ApuDevice * apu) {
     
     // init SDL
     struct sigaction action;
@@ -100,6 +100,9 @@ void ui(PpuDevice * ppu, ApuDevice * apu) {
                 try {
                     keycode = CONTROLLER_MAPPING.at(e.key.keysym.sym);
                 } catch(const std::out_of_range& ex) {
+                    if (e.key.keysym.sym == 'g') {
+                        cpu->setDebug(true);
+                    }
                     continue;
                 }
                 if (e.type == SDL_KEYDOWN) {
@@ -111,7 +114,6 @@ void ui(PpuDevice * ppu, ApuDevice * apu) {
         }
 
         ppu->set_kb_state(kb_state);
-        // ppu->render();
 
         SDL_UpdateTexture(texture, nullptr, frame->data, frame->step1());
         SDL_RenderClear(renderer);
@@ -198,7 +200,7 @@ int main() {
         {rom_base_addr, &rom},
     });
 
-    Emu6502 cpu(&mem, false); //, &lst);
+    Emu6502 cpu(&mem, false, &lst);
     ppu.set_cpu(&cpu); // urgh
     apu.set_cpu(&cpu); // urgh
 
@@ -206,7 +208,7 @@ int main() {
     bool kill = false;
     std::thread t1(run, &cpu, &ppu, &apu, &kill); 
 
-    ui(&ppu, &apu);
+    ui(&cpu, &ppu, &apu);
 
     kill = true;
 
