@@ -129,6 +129,8 @@ void ui(PpuDevice * ppu, ApuDevice * apu) {
 void run(Emu6502 * cpu, PpuDevice * ppu, ApuDevice * apu, bool * thread_done) {
     unsigned long long loopCount = 0;
     auto last_t = Clock::now();
+    float load_sum = 0.0f;
+    int load_num = 0;
     while (!(*thread_done)) {
         cpu->tick();
 
@@ -150,11 +152,17 @@ void run(Emu6502 * cpu, PpuDevice * ppu, ApuDevice * apu, bool * thread_done) {
             auto now = Clock::now();
             // slow down !
             loopCount = 0;
-            long elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(now - last_t).count();
-            if (elapsed_time > TIME_BETWEEN_PAUSE_US) {
-                
-            }
-            // std::cout << TIME_BETWEEN_PAUSE_US - elapsed_time << " " << TIME_BETWEEN_PAUSE_US << " " << elapsed_time << std::endl;
+            long elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(now - last_t).count(); 
+
+            // evaluating cpu load
+            // load_sum += (float)elapsed_time / (float)TIME_BETWEEN_PAUSE_US;
+            // load_num++;
+            // if (load_num == 100) {
+            //     std::cout << "Load : " << load_sum << "%" << std::endl;
+            //     load_sum = 0.0f;
+            //     load_num = 0;
+            // }
+            
             std::this_thread::sleep_for(std::chrono::microseconds(TIME_BETWEEN_PAUSE_US - elapsed_time));
             last_t = Clock::now();
         }
