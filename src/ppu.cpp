@@ -159,10 +159,11 @@ void PpuDevice::tick() {
                 // render background batch of 8 lines
                 render_nametable_line(scanline_no/8);
             }
+            render_oam_line(scanline_no);
         } else if (scanline_no == SCANLINE_VBLANK_START) {
             // we are in the first tick of vblank
             // Let's finish rendering the frame
-            render_oam();
+            // render_oam();
             saveFrame();
 
             // TODO : should not be byte_not a macro or something so it gets notted at compil and not runtime ?
@@ -240,39 +241,41 @@ void PpuDevice::render_nametable_line(uint8_t screen_sprite_y) {
 }
 
 // renders the various sprites
-void PpuDevice::render_oam() {
+void PpuDevice::render_oam_line(uint8_t line_no) {
     
     bool spritesize = get_ppuctrl_bit(PPUCTRL_SPRITESIZE);
 
-    if (!spritesize) {
-
-        for (int8_t i = 0; i < 64; i++) { // i = sprite no. thus i = 0 => sprite 0 for collision
-            uint8_t sprite_y = m_ppuoam[i*4]; // top to bottom
-            uint8_t sprite_no = m_ppuoam[i*4+1];
-            uint8_t sprite_attr = m_ppuoam[i*4+2];
-            uint8_t sprite_x = m_ppuoam[i*4+3]; // left to right
-            if (sprite_y == 255) {
-                // TODO : I guess this should be handled differently!
-                continue;
-            }
-            // TODO : those declare should not rather be outside the loop ? Maybe it is optimized by the compil.
-            bool hflip = ((sprite_attr & PPUOAM_ATT_HFLIP) != 0);
-            bool vflip = ((sprite_attr & PPUOAM_ATT_VFLIP) != 0);
-            uint8_t palette_no = (sprite_attr & 0b11) + 4; // add 4 to reach OAM palette
-            bool table_no = get_ppuctrl_bit(PPUCTRL_OAMPATTTABLE);
-            // TODO : this is a lot of checks just for the first sprite...
-            bool collision;
-            if (i==0) {
-                collision = add_sprite(sprite_no, table_no, sprite_x, sprite_y, palette_no, hflip, vflip, true, true);
-                if (collision) {
-                    m_ppustatus |= PPUSTATUS_SPRITE0_COLLISION;
-                }
-            } else {
-                add_sprite(sprite_no, table_no, sprite_x, sprite_y, palette_no, hflip, vflip, true, false);
-            }
-        }
-    } else {
+    if (spritesize) {
         throw std::runtime_error("16x8 tiles not supported yet");
+    }
+    for (int8_t i = 0; i < 64; i++) { // i = sprite no. thus i = 0 => sprite 0 for collision
+        uint8_t sprite_y = m_ppuoam[i*4]; // top to bottom
+        uint8_t sprite_no = m_ppuoam[i*4+1];
+        uint8_t sprite_attr = m_ppuoam[i*4+2];
+        uint8_t sprite_x = m_ppuoam[i*4+3]; // left to right
+        if (sprite_y < line_no - 7 || sprite_y > line_no) {
+            // sprite not on this line
+            continue;
+        }
+        if (sprite_y == 255) {
+            // TODO : I guess this should be handled differently!
+            continue;
+        }
+        // TODO : those declare should not rather be outside the loop ? Maybe it is optimized by the compil.
+        bool hflip = ((sprite_attr & PPUOAM_ATT_HFLIP) != 0);
+        bool vflip = ((sprite_attr & PPUOAM_ATT_VFLIP) != 0);
+        uint8_t palette_no = (sprite_attr & 0b11) + 4; // add 4 to reach OAM palette
+        bool table_no = get_ppuctrl_bit(PPUCTRL_OAMPATTTABLE);
+        // TODO : this is a lot of checks just for the first sprite...
+        bool collision;
+        if (i==0) {
+            collision = add_sprite_line(sprite_no, table_no, sprite_x, sprite_y, line_no - sprite_y, palette_no, hflip, vflip, true, true);
+            if (collision) {
+                m_ppustatus |= PPUSTATUS_SPRITE0_COLLISION;
+            }
+        } else {
+            add_sprite_line(sprite_no, table_no, sprite_x, sprite_y, line_no - sprite_y, palette_no, hflip, vflip, true, false);
+        }
     }
 }
 
@@ -329,6 +332,44 @@ bool PpuDevice::add_sprite(uint8_t sprite_no, bool table_no, uint8_t sprite_x, u
     return sprite0_collision;
 }
 
+bool PpuDevice::add_sprite_line(uint8_t sprite_no, bool table_no, uint8_t sprite_x, uint8_t sprite_y, uint8_t sprite_line, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision) { //(self, sprite_no, sprite_table_no, frame, spritex, spritey, palette_no, palettes, hflip, vflip):
+    // palette = palettes[palette_no*4:palette_no*4 + 4]
+    uint8_t sprite[8];
+    get_sprite_line(sprite, sprite_no, table_no, sprite_line, hflip, vflip);
+    bool sprite0_collision = false;
+    for (uint8_t x = 0; x < 8; x++) {
+        // if (sprite_x + x >= 256) {
+        //     continue;
+        // }
+        uint8_t pix_color = sprite[x];
+        uint8_t r = 0;
+        uint8_t g = 0;
+        uint8_t b = 0; // TODO : set here transparent bg
+        if (pix_color != 0) {
+            // 0x3f00 : palettes location in vram
+            // a palette : a set of 4 colors (4 bytes then)
+            // palette_no : the index of the palette in the palette list
+            // pix_color : the color in the palette
+            uint8_t color_no = m_vram[0x3f00 + static_cast<uint16_t>(palette_no) * 4 + static_cast<uint16_t>(pix_color)];
+            r = NES_COLORS[color_no][0]; // TODO : get pointer
+            g = NES_COLORS[color_no][1];
+            b = NES_COLORS[color_no][2];
+            cv::Vec3b bg_color = m_next_frame.at<cv::Vec3b>(sprite_y + sprite_line, sprite_x + x);
+            // TODO : same here,a lot of check for the sprite 0
+            if (check_collision && (bg_color[0] != 0 || bg_color[1] != 0 || bg_color[2] != 0)) {
+                // background is set
+                // TODO : do better, it relies on the background being black and nothing else being black
+                sprite0_collision = true;
+            }
+        } else if (transparent_bg) {
+            continue;
+        }
+        // TODO there are fatser ways to populate a frame
+        m_next_frame.at<cv::Vec3b>(sprite_y + sprite_line, sprite_x + x) = cv::Vec3b(r, g, b);
+    }
+    return sprite0_collision;
+}
+
 void PpuDevice::get_sprite(uint8_t sprite[8][8], uint8_t sprite_no, bool table_no, bool doubletile) {
     /*
     sprite is a uint8_t[8][8];
@@ -350,6 +391,31 @@ void PpuDevice::get_sprite(uint8_t sprite[8][8], uint8_t sprite_no, bool table_n
         }
     }
 }
+
+void PpuDevice::get_sprite_line(uint8_t sprite[8], uint8_t sprite_no, bool table_no, uint8_t sprite_line, bool hflip, bool vflip) {
+    /*
+    sprite is a uint8_t[8];
+    doubletile : 16x8 tile mode
+    */
+    uint8_t local_sprite_line = sprite_line;
+    if (vflip) {
+        local_sprite_line = 7 - sprite_line;
+    }
+    uint16_t plane0_addr = (sprite_no + 256*table_no) << 4;
+    uint8_t plane0 = m_chr_rom[plane0_addr + sprite_line];
+    uint8_t plane1 = m_chr_rom[plane0_addr + sprite_line + 8];
+    for (uint8_t i = 0; i < 8; i++) {
+        uint8_t color0 = (plane0 >> i) & 1;
+        uint8_t color1 = (plane1 >> i) & 1;
+        uint8_t color = (color1 << 1) + color0;
+        if (hflip) {
+            sprite[i] = color;
+        } else {
+            sprite[7-i] = color;
+        }
+    }
+}
+
 
 cv::Mat * PpuDevice::getFrame() {
     return &m_last_frame;
