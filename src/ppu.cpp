@@ -66,9 +66,7 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
     case KEY_PPUSCROLL:
         if (m_ppu_reg_w == 0) {
             // 1st write, we are reading X
-            if (value != 0) {
-                m_ppuscroll_x = value;
-            }
+            m_ppuscroll_x = value;
             m_ppu_reg_w = 1;
         } else if (m_ppu_reg_w) {
             // 2nd write, we are reading Y
@@ -272,7 +270,7 @@ void PpuDevice::render_oam_line(uint8_t line_no) {
         bool table_no = get_ppuctrl_bit(PPUCTRL_OAMPATTTABLE);
         // TODO : this is a lot of checks just for the first sprite...
         bool collision;
-        if (i==0) {
+        if (i==0 && line_no >= 2) {
             collision = add_sprite_line(sprite_no, table_no, sprite_x, sprite_y, line_no - sprite_y, palette_no, hflip, vflip, true, true);
             if (collision) {
                 m_ppustatus |= PPUSTATUS_SPRITE0_COLLISION;
