@@ -179,10 +179,10 @@ int main() {
     // parseInes("../rom/Donkey-Kong-NES-Disassembly/dk.nes", prg, chr, &prgLen, &chrLen);
     // LstDebuggerAsm6 lst("../rom/Donkey-Kong-NES-Disassembly/dk.lst", true);
 
-    // parseInes("/home/titus/dev/nesquick/rom/smb1/bin/smb1.nes", prg, chr, &prgLen, &chrLen);
-    // LstDebuggerAsm6 lst("/home/titus/dev/nesquick/rom/smb1/bin/smb1.lst", true);
+    parseInes("/home/titus/dev/nesquick/rom/smb1/bin/smb1.nes", prg, chr, &prgLen, &chrLen);
+    LstDebuggerAsm6 lst("/home/titus/dev/nesquick/rom/smb1/bin/smb1.lst", true);
 
-    parseInes("/home/titus/dev/nesquick/rom/pacman.nes", prg, chr, &prgLen, &chrLen);
+    // parseInes("/home/titus/dev/nesquick/rom/pacman.nes", prg, chr, &prgLen, &chrLen);
 
 
     uint16_t rom_base_addr = 0x10000 - prgLen;
@@ -200,7 +200,7 @@ int main() {
         {rom_base_addr, &rom},
     });
 
-    Emu6502 cpu(&mem, false); //, &lst);
+    Emu6502 cpu(&mem, false, &lst);
     ppu.set_cpu(&cpu); // urgh
     apu.set_cpu(&cpu); // urgh
 
