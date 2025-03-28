@@ -150,30 +150,34 @@ uint8_t PpuDevice::get(uint16_t addr) {
 }
 
 void PpuDevice::tick() {
-    if ((m_ntick % SCANLINE_LENGHT) == 0) {
+    uint16_t scanline_no = m_ntick / SCANLINE_LENGHT;
+    uint16_t column_no = m_ntick % SCANLINE_LENGHT;
+    if (column_no == 0) {
         // beginning of a new visible scanline
-        uint16_t scanline_no = m_ntick / SCANLINE_LENGHT;
         if (scanline_no < SCANLINE_VBLANK_START) {
             // we are in a visible scanline
             if (scanline_no%8 == 0) {
                 // render background batch of 8 lines
                 render_nametable_line(scanline_no/8);
+                std::cout << (int)m_ppuscroll_x << " ";
             }
             render_oam_line(scanline_no);
-        } else if (scanline_no == SCANLINE_VBLANK_START) {
+        }
+    } else if (column_no == 1) {
+        if (scanline_no == SCANLINE_VBLANK_START) {
             // we are in the first tick of vblank
             // Let's finish rendering the frame
             // render_oam();
             saveFrame();
+            std::cout << std::endl;
 
             // TODO : should not be byte_not a macro or something so it gets notted at compil and not runtime ?
             // TODO : check we are resetting SPRITE0 collision flag at the right moment
-            m_ppustatus &= byte_not(PPUSTATUS_SPRITE0_COLLISION);
             if (get_ppuctrl_bit(PPUCTRL_VBLANKNMI)) {
                 m_cpu->interrupt(false);
             }
-        } else {
-            // inside the vblank, nothing to do
+        } else if (scanline_no == SCANLINE_FLAG_CLEAR) {
+            m_ppustatus &= byte_not(PPUSTATUS_SPRITE0_COLLISION);
         }
     }
     m_ntick += 1;

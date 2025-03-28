@@ -38,6 +38,7 @@ const uint8_t NES_COLORS[64][3] = {{124, 124, 124}, {0, 0, 252}, {0, 0, 188}, {6
 const uint16_t SCANLINE_LENGHT = 341;
 const uint16_t SCANLINE_NUMBER = 262;
 const uint16_t SCANLINE_VBLANK_START = 241;
+const uint16_t SCANLINE_FLAG_CLEAR = 261;
 
 class PpuDevice : public Device {
 private:
