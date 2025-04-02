@@ -4,6 +4,7 @@
 
 #include "device.hpp"
 #include "cpu.hpp"
+#include <string>
 
 
 enum {
@@ -73,6 +74,8 @@ private:
     
     cv::Mat m_next_frame; // frame that we are building
     cv::Mat m_last_frame; // last frame that we built
+
+    std::string m_dbg_string;
 
     
     bool get_ppuctrl_bit(uint8_t status_bit);

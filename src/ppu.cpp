@@ -157,7 +157,8 @@ void PpuDevice::tick() {
             if (scanline_no%8 == 0) {
                 // render background batch of 8 lines
                 render_nametable_line(scanline_no/8);
-                std::cout << (int)m_ppuscroll_x << " ";
+                m_dbg_string.append(std::to_string((int)m_ppuscroll_x));
+                m_dbg_string.append(" ");
             }
             render_oam_line(scanline_no);
         }
@@ -167,7 +168,8 @@ void PpuDevice::tick() {
             // Let's finish rendering the frame
             // render_oam();
             saveFrame();
-            std::cout << std::endl;
+            std::cout << "DBGSCROLL " << m_dbg_string << std::endl;
+            m_dbg_string = "";
 
             // TODO : should not be byte_not a macro or something so it gets notted at compil and not runtime ?
             // TODO : check we are resetting SPRITE0 collision flag at the right moment
