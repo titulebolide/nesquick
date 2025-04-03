@@ -88,7 +88,7 @@ private:
     void get_sprite_line(uint8_t sprite[8], uint8_t sprite_no, bool table_no, uint8_t sprite_line, bool hflip, bool vflip);
     
     
-    public:
+public:
     void render_oam();
     void render_oam_line(uint8_t line_no);
     void render_nametable_line(uint8_t screen_sprite_y);

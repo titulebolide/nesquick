@@ -406,8 +406,8 @@ void PpuDevice::get_sprite_line(uint8_t sprite[8], uint8_t sprite_no, bool table
         local_sprite_line = 7 - sprite_line;
     }
     uint16_t plane0_addr = (sprite_no + 256*table_no) << 4;
-    uint8_t plane0 = m_chr_rom[plane0_addr + sprite_line];
-    uint8_t plane1 = m_chr_rom[plane0_addr + sprite_line + 8];
+    uint8_t plane0 = m_chr_rom[plane0_addr + local_sprite_line];
+    uint8_t plane1 = m_chr_rom[plane0_addr + local_sprite_line + 8];
     for (uint8_t i = 0; i < 8; i++) {
         uint8_t color0 = (plane0 >> i) & 1;
         uint8_t color1 = (plane1 >> i) & 1;
