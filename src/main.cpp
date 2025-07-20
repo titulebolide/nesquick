@@ -57,7 +57,7 @@ void ui(Emu6502 * cpu, PpuDevice * ppu, ApuDevice * apu) {
         return;
     }
 
-    SDL_Window* window = SDL_CreateWindow("Display Image", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 32*8*3, 30*8*3, SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_INPUT_FOCUS);
+    SDL_Window* window = SDL_CreateWindow("Display Image", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, 64*8, 60*8, SDL_WINDOW_SHOWN | SDL_WINDOW_ALLOW_HIGHDPI | SDL_WINDOW_INPUT_FOCUS);
     if (window == nullptr) {
         std::cerr << "SDL_CreateWindow Error: " << SDL_GetError() << std::endl;
         SDL_Quit();
@@ -72,7 +72,7 @@ void ui(Emu6502 * cpu, PpuDevice * ppu, ApuDevice * apu) {
         return;
     }
 
-    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, 32*8, 30*8);
+    SDL_Texture* texture = SDL_CreateTexture(renderer, SDL_PIXELFORMAT_RGB24, SDL_TEXTUREACCESS_STREAMING, 64*8, 60*8);
     if (texture == nullptr) {
         std::cerr << "SDL_CreateTexture Error: " << SDL_GetError() << std::endl;
         SDL_DestroyRenderer(renderer);
@@ -82,6 +82,8 @@ void ui(Emu6502 * cpu, PpuDevice * ppu, ApuDevice * apu) {
     }
 
     cv::Mat * frame = ppu->getFrame();
+
+    cv::Mat dbg_frame(64*8, 64*8, CV_8UC3);
     
     bool thread_done = false;
 
@@ -115,7 +117,15 @@ void ui(Emu6502 * cpu, PpuDevice * ppu, ApuDevice * apu) {
 
         ppu->set_kb_state(kb_state);
 
-        SDL_UpdateTexture(texture, nullptr, frame->data, frame->step1());
+        ppu->dbg_render_fullnametable(&dbg_frame);
+
+        // Define the ROI in the larger frame where the smaller frame will be placed
+        cv::Rect roi(0, 240, 256, 240);
+
+        // Copy the smaller frame into the ROI of the larger frame
+        frame->copyTo(dbg_frame(roi));
+
+        SDL_UpdateTexture(texture, nullptr, dbg_frame.data, dbg_frame.step1());
         SDL_RenderClear(renderer);
         SDL_RenderCopy(renderer, texture, nullptr, nullptr);
         SDL_RenderPresent(renderer);

@@ -157,7 +157,7 @@ void PpuDevice::tick() {
             if (scanline_no%8 == 0) {
                 // render background batch of 8 lines
                 render_nametable_line(scanline_no/8);
-                m_dbg_string.append(std::to_string((int)m_ppuscroll_x));
+                m_dbg_string.append(std::to_string((int)(m_ppuctrl & 0b11)));
                 m_dbg_string.append(" ");
             }
             render_oam_line(scanline_no);
@@ -196,7 +196,7 @@ void PpuDevice::render_nametable_line(uint8_t screen_sprite_y) {
     for (int16_t screen_sprite_x = 0; screen_sprite_x < 32; screen_sprite_x++) {
         uint16_t sprite_x = screen_sprite_x + static_cast<uint16_t>(m_ppuscroll_x/8);
         uint16_t sprite_y = screen_sprite_y + static_cast<uint16_t>(m_ppuscroll_y/8);
-        uint16_t nametable_no = m_ppuctrl & 0b11;
+        uint16_t nametable_no = 0; //m_ppuctrl & 0b11;  
         if (sprite_y >= 30) {
             // crossing vertically the nametables
             sprite_y -= 30;
@@ -240,7 +240,50 @@ void PpuDevice::render_nametable_line(uint8_t screen_sprite_y) {
         }
         uint8_t palette_no = ((m_vram[nametable_base_addr + attribute_table_addr] >> attr_bitshift) & 0b11);
         bool table_no = get_ppuctrl_bit(PPUCTRL_BGPATTTABLE);
-        bool collision = add_sprite(sprite_no, table_no, screen_sprite_x*8-x_shift, screen_sprite_y*8-y_shift, palette_no, false, false, false, false);
+        bool collision = add_sprite(&m_next_frame, sprite_no, table_no, screen_sprite_x*8-x_shift, screen_sprite_y*8-y_shift, palette_no, false, false, false, false);
+    }
+}
+
+void PpuDevice::dbg_render_fullnametable(cv::Mat * dbg_frame) {
+    // x is left to right
+    // y is up to down
+    // but for imshow x is up to down, y is left to right
+    for (int8_t screen_sprite_y = 0; screen_sprite_y < 60; screen_sprite_y++) {
+        for (int16_t screen_sprite_x = 0; screen_sprite_x < 64; screen_sprite_x++) {
+            uint16_t sprite_x = screen_sprite_x;
+            uint16_t sprite_y = screen_sprite_y;
+            uint16_t nametable_no = 0;
+            if (sprite_y >= 30) {
+                sprite_y -= 30;
+                nametable_no += 2;
+            }
+            if (sprite_x >= 32) {
+                sprite_x -= 32;
+                nametable_no += 1;
+            }
+            uint16_t nametable_base_addr = 0x2000 + 0x400*nametable_no;
+            uint8_t sprite_no = m_vram[nametable_base_addr + sprite_x + sprite_y * 32];
+            /*
+            7654 3210
+            |||| ||++- Color bits 3-2 for top left quadrant of this byte
+            |||| ++--- Color bits 3-2 for top right quadrant of this byte
+            ||++------ Color bits 3-2 for bottom left quadrant of this byte
+            ++-------- Color bits 3-2 for bottom right quadrant of this byte
+            */
+            uint16_t attribute_table_addr = 0x3c0 +  (static_cast<uint16_t>(sprite_y) / 4)*8 + static_cast<uint16_t>(sprite_x) / 4;
+            uint8_t attr_bitshift = 0;
+            if (sprite_y % 4 > 1) {
+                // bottom
+                attr_bitshift += 4;
+            }
+            if (sprite_x % 4 > 1) {
+                // right
+                attr_bitshift += 2;
+            }
+            uint8_t palette_no = ((m_vram[nametable_base_addr + attribute_table_addr] >> attr_bitshift) & 0b11);
+            bool table_no = 1; //get_ppuctrl_bit(PPUCTRL_BGPATTTABLE);
+            bool collision = add_sprite(dbg_frame, sprite_no, table_no, screen_sprite_x*8, screen_sprite_y*8, palette_no, false, false, false, false);
+        }
     }
 }
 
@@ -283,7 +326,7 @@ void PpuDevice::render_oam_line(uint8_t line_no) {
     }
 }
 
-bool PpuDevice::add_sprite(uint8_t sprite_no, bool table_no, uint8_t sprite_x, uint8_t sprite_y, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision) { //(self, sprite_no, sprite_table_no, frame, spritex, spritey, palette_no, palettes, hflip, vflip):
+bool PpuDevice::add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, uint16_t sprite_x, uint16_t sprite_y, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision) { //(self, sprite_no, sprite_table_no, frame, spritex, spritey, palette_no, palettes, hflip, vflip):
     // palette = palettes[palette_no*4:palette_no*4 + 4]
     uint8_t sprite[8][8];
     get_sprite(sprite, sprite_no, table_no, false);
@@ -319,7 +362,7 @@ bool PpuDevice::add_sprite(uint8_t sprite_no, bool table_no, uint8_t sprite_x, u
                 r = NES_COLORS[color_no][0]; // TODO : get pointer
                 g = NES_COLORS[color_no][1];
                 b = NES_COLORS[color_no][2];
-                cv::Vec3b bg_color = m_next_frame.at<cv::Vec3b>(sprite_y + y, sprite_x + x);
+                cv::Vec3b bg_color = frame->at<cv::Vec3b>(sprite_y + y, sprite_x + x);
                 // TODO : same here,a lot of check for the sprite 0
                 if (check_collision && (bg_color[0] != 0 || bg_color[1] != 0 || bg_color[2] != 0)) {
                     // background is set
@@ -330,7 +373,7 @@ bool PpuDevice::add_sprite(uint8_t sprite_no, bool table_no, uint8_t sprite_x, u
                 continue;
             }
             // TODO there are fatser ways to populate a frame
-            m_next_frame.at<cv::Vec3b>(sprite_y + y, sprite_x + x) = cv::Vec3b(r, g, b);
+            frame->at<cv::Vec3b>(sprite_y + y, sprite_x + x) = cv::Vec3b(r, g, b);
         }
     }
     return sprite0_collision;

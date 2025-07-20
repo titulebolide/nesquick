@@ -81,7 +81,7 @@ private:
     bool get_ppuctrl_bit(uint8_t status_bit);
 
     void inc_ppuaddr();
-    bool add_sprite(uint8_t sprite_no, bool table_no, uint8_t sprite_x, uint8_t sprite_y, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision);
+    bool add_sprite(cv::Mat *frame, uint8_t sprite_no, bool table_no, uint16_t sprite_x, uint16_t sprite_y, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision);
     bool add_sprite_line(uint8_t sprite_no, bool table_no, uint8_t sprite_x, uint8_t sprite_y, uint8_t sprite_line, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision);
     void get_sprite(uint8_t sprite[8][8], uint8_t sprite_no, bool table_no, bool doubletile);
 
@@ -92,7 +92,8 @@ public:
     void render_oam();
     void render_oam_line(uint8_t line_no);
     void render_nametable_line(uint8_t screen_sprite_y);
-    PpuDevice(uint8_t * chr_rom, Device * cpu_ram, Device * apu);
+    void dbg_render_fullnametable(cv::Mat *dbg_frame);
+    PpuDevice(uint8_t *chr_rom, Device *cpu_ram, Device *apu);
     uint8_t get(uint16_t addr);
     void set(uint16_t addr, uint8_t val);
     void tick();
