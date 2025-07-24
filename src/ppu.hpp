@@ -57,8 +57,8 @@ private:
 
     uint8_t m_vram[0x4000] = {0}; // 14 bit addr space
     uint32_t m_ntick = 0;
-    uint8_t m_ppu_reg_w = 0;
-    uint16_t m_ppuaddr = 0;
+    uint8_t m_ppu_reg_w = 0; // First or second write toggle
+    uint16_t m_ppuaddr = 0; // PPU register V
     uint8_t m_ppuctrl = 0;
     uint8_t m_ppustatus = 0;
     uint8_t m_ppuoam[256] = {0};

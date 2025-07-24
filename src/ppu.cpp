@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <cstdlib>
 
 #include "ppu.hpp"
@@ -124,6 +125,7 @@ uint8_t PpuDevice::get(uint16_t addr) {
     case KEY_PPUSTATUS:
         // TODO : implement PPUSTATUS for real
         retval = 0b10000000 | m_ppustatus;
+        m_ppu_reg_w = 0;
         break;
     
     case KEY_CTRL1:
@@ -156,7 +158,7 @@ void PpuDevice::tick() {
             // we are in a visible scanline
             if (scanline_no%8 == 0) {
                 // render background batch of 8 lines
-                render_nametable_line(scanline_no/8);
+                render_nametable_line(scanline_no / 8);
                 m_dbg_string.append(std::to_string((int)(m_ppuctrl & 0b11)));
                 m_dbg_string.append(" ");
             }
@@ -192,7 +194,7 @@ void PpuDevice::render_nametable_line(uint8_t screen_sprite_y) {
     // y is up to down
     // but for imshow x is up to down, y is left to right
     uint8_t y_shift = 0; // (m_ppuscroll_y+1)%8;
-    uint8_t x_shift = 0; //(m_ppuscroll_x+1)%8;
+    uint8_t x_shift = m_ppuscroll_x % 8;
     for (int16_t screen_sprite_x = 0; screen_sprite_x < 32; screen_sprite_x++) {
         uint16_t sprite_x = screen_sprite_x + static_cast<uint16_t>(m_ppuscroll_x/8);
         uint16_t sprite_y = screen_sprite_y + static_cast<uint16_t>(m_ppuscroll_y/8);
@@ -240,11 +242,16 @@ void PpuDevice::render_nametable_line(uint8_t screen_sprite_y) {
         }
         uint8_t palette_no = ((m_vram[nametable_base_addr + attribute_table_addr] >> attr_bitshift) & 0b11);
         bool table_no = get_ppuctrl_bit(PPUCTRL_BGPATTTABLE);
-        bool collision = add_sprite(&m_next_frame, sprite_no, table_no, screen_sprite_x*8-x_shift, screen_sprite_y*8-y_shift, palette_no, false, false, false, false);
+        uint8_t actual_x_shift = 0;
+        if (screen_sprite_x >= 1) {
+          actual_x_shift = x_shift;
+        }
+        bool collision = add_sprite(&m_next_frame, sprite_no, table_no, screen_sprite_x*8-actual_x_shift, screen_sprite_y*8-y_shift, palette_no, false, false, false, false);
     }
 }
 
 void PpuDevice::dbg_render_fullnametable(cv::Mat * dbg_frame) {
+    static uint16_t prevscroll = 0;
     // x is left to right
     // y is up to down
     // but for imshow x is up to down, y is left to right
@@ -284,6 +291,14 @@ void PpuDevice::dbg_render_fullnametable(cv::Mat * dbg_frame) {
             bool table_no = 1; //get_ppuctrl_bit(PPUCTRL_BGPATTTABLE);
             bool collision = add_sprite(dbg_frame, sprite_no, table_no, screen_sprite_x*8, screen_sprite_y*8, palette_no, false, false, false, false);
         }
+    }
+
+    for (uint16_t x = 0; x < 60*8; x++) {
+      // skip the zero values (HUD displaying)
+      if (m_ppuscroll_x != 0) {
+        prevscroll = m_ppuscroll_x;
+      }
+      dbg_frame->at<cv::Vec3b>(x, prevscroll) = cv::Vec3b(255, 0, 0);
     }
 }
 
