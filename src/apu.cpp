@@ -1,5 +1,12 @@
 #include "apu.hpp"
-#include "utils.hpp"
+#include "device.hpp"
+#include <cstdint>
+#include <iostream>
+#include <ostream>
+
+static float periodToFrequency(uint16_t period) {
+  return CLOCK_FREQUENCY / (16.0f*( static_cast<float>(period) + 1));
+}
 
 ApuDevice::ApuDevice() {
     return;
@@ -17,26 +24,32 @@ uint8_t ApuDevice::get(uint16_t addr) {
     return 0;
 }
 
-void ApuDevice::set(uint16_t addr , uint8_t value) {
+void ApuDevice::set_duty_envelope(int chan, uint16_t value) {
+    m_square[chan].duty_cycle_no = value >> 6;
+    m_sound_engine.setDutyCycle(chan, DUTY_CYCLE_VALUES[m_square[chan].duty_cycle_no]);
+    m_square[chan].constant_volume = ((value & BIT4) != 0);
+    if (m_square[chan].constant_volume) {
+        m_square[chan].volume = value & 0b1111;
+        m_square[chan].envolope_decay_speed = 0;
+    } else {
+        m_square[chan].volume = 15;
+        m_square[chan].envolope_decay_speed = value & 0b1111;
+        m_square[chan].decay_counter = m_square[chan].envolope_decay_speed;
+    }
+    m_sound_engine.setAmplitude(chan, static_cast<float>(m_square[chan].volume)/15*MAX_AMPLITUDE);
+}
+
+void ApuDevice::set(uint16_t addr, uint8_t value) {
     uint8_t retval;
     float dur, freq;
 
     switch (addr) {
-    case KEY_PULSE1_DUTY_ENVELOPE:
-        m_square[0].duty_cycle_no = value >> 6;
-        m_sound_engine.setDutyCycle(0, DUTY_CYCLE_VALUES[m_square[0].duty_cycle_no]);
-        m_square[0].constant_volume = ((value & BIT4) != 0);
-        if (m_square[0].constant_volume) {
-            m_square[0].volume = value & 0b1111;
-            m_square[0].envolope_decay_speed = 0;
-        } else {
-            m_square[0].volume = 15;
-            m_square[0].envolope_decay_speed = value & 0b1111;
-            m_square[0].decay_counter = m_square[0].envolope_decay_speed;
-            m_sound_engine.setAmplitude(0, MAX_AMPLITUDE); // init amplitude
+    case KEY_TEST2:
+      std::cout << "sweep " << (value & BIT7) << std::endl;
 
-        }
-        break;
+    case KEY_PULSE1_DUTY_ENVELOPE:
+       set_duty_envelope(0, value);
+       break;
 
     case KEY_PULSE1_PERIOD_LOW:
         m_square[0].period = (m_square[0].period & 0xff00) | static_cast<uint16_t>(value);
@@ -53,18 +66,7 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
         break;
 
     case KEY_PULSE2_DUTY_ENVELOPE:
-        m_square[1].duty_cycle_no = value >> 6;
-        m_sound_engine.setDutyCycle(1, DUTY_CYCLE_VALUES[m_square[1].duty_cycle_no]);
-        m_square[1].constant_volume = ((value & BIT4) != 0);
-        if (m_square[1].constant_volume) {
-            m_square[1].volume = value & 0b1111;
-            m_square[1].envolope_decay_speed = 0;
-        } else {
-            m_square[1].volume = 15;
-            m_square[1].envolope_decay_speed = value & 0b1111;
-            m_square[1].decay_counter = m_square[1].envolope_decay_speed;
-            m_sound_engine.setAmplitude(1, MAX_AMPLITUDE); // init amplitude
-        }
+        set_duty_envelope(1, value);
         break;
     
     case KEY_PULSE2_PERIOD_LOW:
@@ -74,6 +76,7 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
     case KEY_PULSE2_PERIOD_HIGH:
         m_square[1].period = (static_cast<uint16_t>(value & 0b111) << 8) | (m_square[1].period & 0x00ff);
         m_square[1].length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
+        std::cout << m_square[1].length << std::endl;
         m_sound_engine.setFrequency(
             1, 
             CLOCK_FREQUENCY /  (16.0f*( static_cast<float>(m_square[1].period) + 1)), 
@@ -92,7 +95,7 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
         freq = CLOCK_FREQUENCY / 2.0f / (16.0f*( static_cast<float>(m_triangle.period) + 1));
         dur = m_triangle.length / 6.0f / 240.0f; // why 6 ?
         dur = static_cast<float>(static_cast<int>(dur*freq)/freq); // round duration to a multiple of the period, to prevent popping when ending the sound
-        m_sound_engine.setFrequency(2, freq, dur); 
+        m_sound_engine.setFrequency(2, freq*0, dur); 
         break;
 
     case KEY_STATUS:
@@ -110,7 +113,7 @@ void ApuDevice::set(uint16_t addr , uint8_t value) {
         // and call the quarter and half frame tick
         quarter_frame_tick();
         half_frame_tick();
-        m_apu_cycle_count == 0;
+        m_apu_cycle_count = 0;
         break;
 
     default:
@@ -184,4 +187,6 @@ void ApuDevice::quarter_frame_tick() {
 }
 
 void ApuDevice::half_frame_tick() {
+
 }
+

@@ -170,7 +170,7 @@ void PpuDevice::tick() {
             // Let's finish rendering the frame
             // render_oam();
             saveFrame();
-            std::cout << "DBGSCROLL " << m_dbg_string << std::endl;
+            // std::cout << "DBGSCROLL " << m_dbg_string << std::endl;
             m_dbg_string = "";
 
             // TODO : should not be byte_not a macro or something so it gets notted at compil and not runtime ?
@@ -198,7 +198,10 @@ void PpuDevice::render_nametable_line(uint8_t screen_sprite_y) {
     for (int16_t screen_sprite_x = 0; screen_sprite_x < 32; screen_sprite_x++) {
         uint16_t sprite_x = screen_sprite_x + static_cast<uint16_t>(m_ppuscroll_x/8);
         uint16_t sprite_y = screen_sprite_y + static_cast<uint16_t>(m_ppuscroll_y/8);
-        uint16_t nametable_no = 0; //m_ppuctrl & 0b11;  
+        uint16_t nametable_no = m_ppuctrl & 0b11;  
+        if (screen_sprite_y <= 3) {
+          nametable_no = 0;
+        }
         if (sprite_y >= 30) {
             // crossing vertically the nametables
             sprite_y -= 30;
@@ -295,9 +298,9 @@ void PpuDevice::dbg_render_fullnametable(cv::Mat * dbg_frame) {
 
     for (uint16_t x = 0; x < 60*8; x++) {
       // skip the zero values (HUD displaying)
-      if (m_ppuscroll_x != 0) {
+      //if (m_ppuscroll_x != 0) {
         prevscroll = m_ppuscroll_x;
-      }
+      //}
       dbg_frame->at<cv::Vec3b>(x, prevscroll) = cv::Vec3b(255, 0, 0);
     }
 }

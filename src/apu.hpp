@@ -5,6 +5,8 @@
 
 enum {
     KEY_PULSE1_DUTY_ENVELOPE = 0x4000,
+    KEY_TEST1 = 0x4001,
+    KEY_TEST2 = 0x4005,
     KEY_PULSE1_PERIOD_LOW = 0x4002,
     KEY_PULSE1_PERIOD_HIGH = 0x4003,
 
@@ -64,6 +66,7 @@ class ApuDevice : public Device {
  private:
     void quarter_frame_tick();
     void half_frame_tick();
+    void set_duty_envelope(int chan, uint16_t value);
 
 private:
     // TODO : needed to call IRQ, bu can do better than this

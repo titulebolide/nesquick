@@ -9,4 +9,8 @@
 - in some places a static cast could be removed in favour of just chaning the type of the base variable. Takes bit more space but faster.
 - use arenas
 - Fix scrolling by handling internal regs https://www.nesdev.org/wiki/PPU_scrolling#PPU_internal_registers
+- Fix notes fading (e.g SMB music)
+- Set background color
+- Fix SMB title color
+- be a bit more subtle on overlowing sprite with x scroll (currently rejecting overflowing sprites)
 
