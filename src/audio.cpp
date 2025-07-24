@@ -41,10 +41,14 @@ void SoundEngine::validateChannelNo(int channel) {
     }
 }
 
-void SoundEngine::setFrequency(int channel, float frequency, float duration)
+void SoundEngine::setFrequency(int channel, float frequency)
 {   
     validateChannelNo(channel);
     m_square[channel].frequency = frequency;
+}
+
+void SoundEngine::setDuration(int channel, float duration) {
+    validateChannelNo(channel);
     m_square[channel].left_duration = duration;
 }
 

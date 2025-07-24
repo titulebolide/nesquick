@@ -38,7 +38,8 @@ public:
     SoundEngine();
     ~SoundEngine();
     void startSound();
-    void setFrequency(int channel, float frequency, float duration);
+    void setFrequency(int channel, float frequency);
+    void setDuration(int channel, float duration);
     void setAmplitude(int channel, float amplitude);
     void setDutyCycle(int channel, float duty_cycle);
     void setChannelEnable(int channel, float enable);

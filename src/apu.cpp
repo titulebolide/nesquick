@@ -44,8 +44,12 @@ void ApuDevice::set(uint16_t addr, uint8_t value) {
     float dur, freq;
 
     switch (addr) {
-    case KEY_TEST2:
-      std::cout << "sweep " << (value & BIT7) << std::endl;
+    case KEY_PULSE1_SWEEP:
+      m_square[0].sweep_enable = ((value & BIT7) != 0);
+      m_square[0].sweep_negate = ((value & BIT3) != 0);
+      m_square[0].sweep_period = ((value & (BIT6|BIT5|BIT4)) >> 4);
+      m_square[0].sweep_shift_count = (value & (BIT2|BIT1|BIT0));
+      break;
 
     case KEY_PULSE1_DUTY_ENVELOPE:
        set_duty_envelope(0, value);
@@ -60,7 +64,9 @@ void ApuDevice::set(uint16_t addr, uint8_t value) {
         m_square[0].length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
         m_sound_engine.setFrequency(
             0, 
-            CLOCK_FREQUENCY / (16.0f*( static_cast<float>(m_square[0].period) + 1)), 
+            CLOCK_FREQUENCY / (16.0f*( static_cast<float>(m_square[0].period) + 1)));
+        m_sound_engine.setDuration(
+            0,
             m_square[0].length / 240.0f
         );
         break;
@@ -76,12 +82,11 @@ void ApuDevice::set(uint16_t addr, uint8_t value) {
     case KEY_PULSE2_PERIOD_HIGH:
         m_square[1].period = (static_cast<uint16_t>(value & 0b111) << 8) | (m_square[1].period & 0x00ff);
         m_square[1].length = APU_LENGTH_COUNTER_LOAD[(value & 0b11111000) >> 3];
-        std::cout << m_square[1].length << std::endl;
         m_sound_engine.setFrequency(
             1, 
-            CLOCK_FREQUENCY /  (16.0f*( static_cast<float>(m_square[1].period) + 1)), 
-            m_square[1].length / 240.0f
+            CLOCK_FREQUENCY /  (16.0f*( static_cast<float>(m_square[1].period) + 1))
         );
+        m_sound_engine.setDuration(1, m_square[1].length/240.0f);
         break;
 
     case KEY_TRI_PERIOD_LOW:
@@ -95,7 +100,8 @@ void ApuDevice::set(uint16_t addr, uint8_t value) {
         freq = CLOCK_FREQUENCY / 2.0f / (16.0f*( static_cast<float>(m_triangle.period) + 1));
         dur = m_triangle.length / 6.0f / 240.0f; // why 6 ?
         dur = static_cast<float>(static_cast<int>(dur*freq)/freq); // round duration to a multiple of the period, to prevent popping when ending the sound
-        m_sound_engine.setFrequency(2, freq, dur); 
+        m_sound_engine.setFrequency(2, freq); 
+        m_sound_engine.setDuration(2, dur);
         break;
 
     case KEY_STATUS:
@@ -132,8 +138,8 @@ void ApuDevice::tick() {
             quarter_frame_tick();
         } else if (m_apu_cycle_count == 2*APU_FRAME_CYCLE_COUNT) {
             // step 2
-            quarter_frame_tick();
             half_frame_tick();
+            quarter_frame_tick();
 
         } else if (m_apu_cycle_count == 3*APU_FRAME_CYCLE_COUNT) {
             // step 3
@@ -151,8 +157,8 @@ void ApuDevice::tick() {
                 // in 5 step mode this step is skipped
                 return;
             }
-            quarter_frame_tick();
             half_frame_tick();
+            quarter_frame_tick();
             m_apu_cycle_count = 0;
 
         } else if (m_apu_cycle_count == 5*APU_FRAME_CYCLE_COUNT) {
@@ -160,8 +166,8 @@ void ApuDevice::tick() {
             // runs at the right cycle count for this one
             // necessarily in 5 steps mode here because it has not been
             // reset on step 4
-            quarter_frame_tick();
             half_frame_tick();
+            quarter_frame_tick();
             m_apu_cycle_count = 0;
 
         }
@@ -171,8 +177,14 @@ void ApuDevice::tick() {
 
 void ApuDevice::quarter_frame_tick() {
     // handle envelope
+    
     for (int chan_no=0; chan_no < 2; chan_no++) {
         squarePulse * square = &m_square[chan_no];
+        
+        if (chan_no == 0 && m_square[0].sweep_enable && (m_square[0].period <= MIN_PERIOD || m_square[0].period >= MAX_PERIOD)) {
+            m_sound_engine.setAmplitude(chan_no, 0);
+        }
+
         if (!square->constant_volume && square->volume > 0) {
             if (square->decay_counter > 0) {
                 square->decay_counter--;
@@ -187,6 +199,18 @@ void ApuDevice::quarter_frame_tick() {
 }
 
 void ApuDevice::half_frame_tick() {
-
+  if (m_square[0].sweep_enable) {
+    if (m_square[0].sweep_counter == 0) {
+      m_square[0].sweep_counter = m_square[0].sweep_period;
+      if (m_square[0].sweep_negate && m_square[0].period > MIN_PERIOD) {
+        m_square[0].period -= m_square[0].sweep_shift_count;
+      } else if (!m_square[0].sweep_negate && m_square[0].period < MAX_PERIOD) {
+        m_square[0].period += m_square[0].sweep_shift_count;
+      }
+      m_sound_engine.setFrequency(0, periodToFrequency(m_square[0].period));
+    } else {
+      m_square[0].sweep_counter--;
+    }
+  }
 }
 
