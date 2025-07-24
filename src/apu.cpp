@@ -95,7 +95,7 @@ void ApuDevice::set(uint16_t addr, uint8_t value) {
         freq = CLOCK_FREQUENCY / 2.0f / (16.0f*( static_cast<float>(m_triangle.period) + 1));
         dur = m_triangle.length / 6.0f / 240.0f; // why 6 ?
         dur = static_cast<float>(static_cast<int>(dur*freq)/freq); // round duration to a multiple of the period, to prevent popping when ending the sound
-        m_sound_engine.setFrequency(2, freq*0, dur); 
+        m_sound_engine.setFrequency(2, freq, dur); 
         break;
 
     case KEY_STATUS:
