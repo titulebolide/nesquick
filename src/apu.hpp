@@ -5,10 +5,12 @@
 
 enum {
     KEY_PULSE1_DUTY_ENVELOPE = 0x4000,
+    KEY_PULSE1_SWEEP = 0x4001,
     KEY_PULSE1_PERIOD_LOW = 0x4002,
     KEY_PULSE1_PERIOD_HIGH = 0x4003,
-
+    
     KEY_PULSE2_DUTY_ENVELOPE = 0x4004,
+    KEY_PULSE2_SWEEP = 0x4005,
     KEY_PULSE2_PERIOD_LOW = 0x4006,
     KEY_PULSE2_PERIOD_HIGH = 0x4007,
 
@@ -31,7 +33,12 @@ struct squarePulse {
     uint8_t volume = 0; // volume to be used in constant volume mode
     uint8_t envolope_decay_speed = 0;
     uint8_t decay_counter = 0;
-    bool enable = 0;
+    bool enable = false;
+    bool sweep_enable = false;
+    uint8_t sweep_period = 0;
+    uint8_t sweep_counter = 0;
+    bool sweep_negate = false;
+    uint8_t sweep_shift_count = 0;
 };
 
 struct trianglePulse {
@@ -42,6 +49,8 @@ struct trianglePulse {
 static int const CLOCK_FREQUENCY = 1789773;
 static int const MAX_AMPLITUDE = 4000;
 const long APU_FRAME_CYCLE_COUNT = 3728; // NTSC
+const uint16_t MAX_PERIOD = 0x7ff;
+const uint16_t MIN_PERIOD = 8;
 
 const float DUTY_CYCLE_VALUES[4] = {0.125, 0.25, 0.5, 0.75};
 
@@ -64,6 +73,11 @@ class ApuDevice : public Device {
  private:
     void quarter_frame_tick();
     void half_frame_tick();
+    void set_duty_envelope(int chan, uint16_t value);
+    void set_sweep(int chan, uint16_t value);
+    void set_period_low(int chan, int16_t value);
+    void set_period_high(int chan, int16_t value);
+    void handle_sweep(int chan);
 
 private:
     // TODO : needed to call IRQ, bu can do better than this

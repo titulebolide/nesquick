@@ -35,38 +35,42 @@ SoundEngine::~SoundEngine()
     SDL_CloseAudio();
 }
 
-void SoundEngine::validateChannelNo(int channel) {
+void SoundEngine::validate_channel_no(int channel) {
     if (!(channel <= 2 && channel >= 0)) {
         throw std::runtime_error("Bad channel number");
     }
 }
 
-void SoundEngine::setFrequency(int channel, float frequency, float duration)
+void SoundEngine::set_frequency(int channel, float frequency)
 {   
-    validateChannelNo(channel);
+    validate_channel_no(channel);
     m_square[channel].frequency = frequency;
+}
+
+void SoundEngine::set_duration(int channel, float duration) {
+    validate_channel_no(channel);
     m_square[channel].left_duration = duration;
 }
 
-void SoundEngine::setAmplitude(int channel, float amplitude)
+void SoundEngine::set_amplitude(int channel, float amplitude)
 {   
-    validateChannelNo(channel);
+    validate_channel_no(channel);
     m_square[channel].amplitude = amplitude;
 }
 
-void SoundEngine::setDutyCycle(int channel, float duty_cycle)
+void SoundEngine::set_duty_cycle(int channel, float duty_cycle)
 {   
-    validateChannelNo(channel);
+    validate_channel_no(channel);
     m_square[channel].duty_cycle = duty_cycle;
 }
 
-void SoundEngine::setChannelEnable(int channel, float enable)
+void SoundEngine::set_channel_enable(int channel, float enable)
 {   
-    validateChannelNo(channel);
+    validate_channel_no(channel);
     m_square[channel].enabled = enable;
 }
 
-void SoundEngine::generateSamples(Sint16 *stream, int length)
+void SoundEngine::generate_samples(Sint16 *stream, int length)
 {
     for (int i = 0; i < length; i++) {
         stream[i] = 0;
@@ -115,5 +119,5 @@ void audio_callback(void *_beeper, Uint8 *_stream, int _length)
     int length = _length / 2;
     SoundEngine* beeper = (SoundEngine*) _beeper;
 
-    beeper->generateSamples(stream, length);
+    beeper->generate_samples(stream, length);
 }
