@@ -31,17 +31,17 @@ class SoundEngine
 private:
     Uint32 start_time;  // Tracks the start time for modulation
     squareWave m_square[3];
-    void validateChannelNo(int channel);
-    float getWave(float phase, int duty_cycle);
+    void validate_channel_no(int channel);
+    float get_wave(float phase, int duty_cycle);
 
 public:
     SoundEngine();
     ~SoundEngine();
     void startSound();
-    void setFrequency(int channel, float frequency);
-    void setDuration(int channel, float duration);
-    void setAmplitude(int channel, float amplitude);
-    void setDutyCycle(int channel, float duty_cycle);
-    void setChannelEnable(int channel, float enable);
-    void generateSamples(Sint16 *stream, int length);
+    void set_frequency(int channel, float frequency);
+    void set_duration(int channel, float duration);
+    void set_amplitude(int channel, float amplitude);
+    void set_duty_cycle(int channel, float duty_cycle);
+    void set_channel_enable(int channel, float enable);
+    void generate_samples(Sint16 *stream, int length);
 };
