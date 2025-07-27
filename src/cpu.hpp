@@ -3,12 +3,6 @@
 #include <vector>
 #include <map>
 #include <cstdint>
-#include <string>
-#include <stdexcept>
-#include <iomanip>
-#include <bitset>
-#include <thread>
-#include <chrono>
 
 #include "cpumem.hpp"
 #include "lstdebugger.hpp"
@@ -19,6 +13,7 @@ const int REG_A = 0;
 const int REG_X = 1;
 const int REG_Y = 2;
 const int REG_S = 3; // status register
+const int REG_SP = 4; // stack_pointer
 
 // Addressing modes
 const int IMMEDIATE = 0;
@@ -78,7 +73,7 @@ private:
     void stack_push(uint8_t val);
     uint8_t stack_pull();
     void store(int reg, uint16_t addr);
-    void transfer(int sreg, int dreg);
+    void transfer(int sreg, int dreg, bool update_zn = true);
     void compare(int reg, uint8_t val);
     void in_de_reg(int reg, bool sign_plus);
     void in_de_mem(uint16_t addr, bool sign_plus);
@@ -147,9 +142,9 @@ private:
 
     void op_tax() { transfer(REG_A, REG_X); }
     void op_tay() { transfer(REG_A, REG_Y); }
-    void op_tsx() { transfer(REG_S, REG_X); }
+    void op_tsx() { transfer(REG_SP, REG_X); }
     void op_txa() { transfer(REG_X, REG_A); }
-    void op_txs() { transfer(REG_X, REG_S); }
+    void op_txs() { transfer(REG_X, REG_SP, false); }
     void op_tya() { transfer(REG_Y, REG_A); }
 
     void op_pha() { ph(REG_A); }
@@ -171,10 +166,9 @@ private:
 
 private:
     bool m_debug;
-    // TODO : either move this to an struct or to a uint8_t regs[4]
     // TODO : all the checks that regs[smth] > 255 are broken because it is an uint8_t
     // TODO : We have to find another way to detect a carry !
-    std::vector<uint8_t> regs;
+    uint8_t regs[5] = {0};
     uint8_t stack_ptr;
     uint16_t prgm_ctr;
     int interrupt_type;

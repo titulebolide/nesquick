@@ -1,11 +1,7 @@
 # pragma once
 
-#include <iostream>
-#include <fstream>
-#include <sstream>
+#include <string>
 #include <unordered_map>
-#include <vector>
-#include <cctype>
 #include <cstdint>
 
 class LstDebuggerAsm6 {

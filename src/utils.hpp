@@ -1,9 +1,10 @@
 #pragma once
 
-#include <cctype>
+#include <cstdint>
 #include <string>
 
 uint8_t byte_not(uint8_t val);
+void sleep(int sec);
 std::string dec2hex(uint16_t val);
 uint8_t low_byte(uint16_t val);
 uint8_t high_byte(uint16_t val);

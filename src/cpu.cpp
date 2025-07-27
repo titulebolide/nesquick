@@ -2,18 +2,15 @@
 #include <vector>
 #include <map>
 #include <stdexcept>
-#include <iomanip>
-#include <bitset>
-#include <thread>
-#include <chrono>
 
 #include "utils.hpp"
 #include "cpu.hpp"
 
+#define DEBUG_TYPE_MESEN true
+
 Emu6502::Emu6502(Memory *mem, bool debug, LstDebuggerAsm6 *lst)
     : m_debug(debug), mem(mem), lst(lst) {
-    regs = {0, 0, 0, 0};
-    stack_ptr = 0xff;
+    regs[REG_SP] = 0xff;
     prgm_ctr = 0;
     interrupt_type = INTERRUPT_RST;
     instruction_cycle = 0;
@@ -120,14 +117,14 @@ void Emu6502::op_jmp() {
 }
 
 void Emu6502::stack_push(uint8_t val) {
-    uint16_t stack_addr = stack_ptr + 0x0100;
+    uint16_t stack_addr = regs[REG_SP] + 0x0100;
     mem->set(stack_addr, val);
-    stack_ptr--;
+    regs[REG_SP]--;
 }
 
 uint8_t Emu6502::stack_pull() {
-    stack_ptr++;
-    uint16_t stack_addr = stack_ptr + 0x0100;
+    regs[REG_SP]++;
+    uint16_t stack_addr = regs[REG_SP] + 0x0100;
     return mem->get(stack_addr);
 }
 
@@ -154,7 +151,7 @@ void Emu6502::op_rts() {
 
 void Emu6502::ph(int reg) {
     // stack begins at 0x01ff and ends at 0x0100
-    if (stack_ptr == 0) {
+    if (regs[REG_SP] == 0) {
         throw std::runtime_error("Stack overflow");
     }
     stack_push(regs[reg]);
@@ -162,7 +159,7 @@ void Emu6502::ph(int reg) {
 
 void Emu6502::pl(int reg) {
     // stack begins at 0x01ff and ends at 0x0100
-    if (stack_ptr == 0xff) {
+    if (regs[REG_SP] == 0xff) {
         throw std::runtime_error("Empty stack");
     }
     uint8_t val = stack_pull();
@@ -193,10 +190,12 @@ void Emu6502::store(int reg, uint16_t addr) {
     mem->set(addr, val);
 }
 
-void Emu6502::transfer(int sreg, int dreg) {
+void Emu6502::transfer(int sreg, int dreg, bool update_zn) {
     uint8_t val = regs[sreg];
     regs[dreg] = val;
-    update_zn_flag(val);
+    if (update_zn) {
+        update_zn_flag(val);
+    }
 }
 
 void Emu6502::compare(int reg, uint8_t val) {
@@ -413,15 +412,20 @@ void Emu6502::dbg() {
     if (prgm_ctr == 0) {
         return;
     }
-    std::string inst = "";
-    if (lst != nullptr) {
-        inst = lst->getInst(prgm_ctr);
-    }
-    std::cout << "\nPC\tinst\tA\tX\tY\tSP\tNV-BDIZC\n";
-    std::cout << std::hex << prgm_ctr << "\t" << hex2(mem->get(prgm_ctr)) << "\t" << hex2(regs[REG_A]) << "\t" << hex2(regs[REG_X]) << "\t" << hex2(regs[REG_Y]) << "\t" << hex2(stack_ptr) << "\t" << bin8(regs[REG_S]) << "\n";
-    std::cout << inst << std::endl;
-    if (inst.find("bkpt") != std::string::npos) {
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+    if (DEBUG_TYPE_MESEN) {
+        // Matching Mesen custom format : A:[A,2h] X:[X,2h] Y:[Y,2h] S:[SP,2h] P:[P,8]
+        std::cout << hexstr(prgm_ctr) << "  A:" << hexstr(regs[REG_A]) << " X:" << hexstr(regs[REG_X]) << " Y:" << hexstr(regs[REG_Y]) << " SP:" << hexstr(regs[REG_SP]) << " S:" << hexstr(regs[REG_S]) << std::endl;
+    } else {
+        std::string inst = "";
+        if (lst != nullptr) {
+            inst = lst->getInst(prgm_ctr);
+        }
+        std::cout << "\nPC\tinst\tA\tX\tY\tSP\tNV-BDIZC\n";
+        std::cout << std::hex << prgm_ctr << "\t" << hex2(mem->get(prgm_ctr)) << "\t" << hex2(regs[REG_A]) << "\t" << hex2(regs[REG_X]) << "\t" << hex2(regs[REG_Y]) << "\t" << hex2(regs[REG_SP]) << "\t" << bin8(regs[REG_S]) << "\n";
+        std::cout << inst << std::endl;
+        if (inst.find("bkpt") != std::string::npos) {
+            sleep(2);
+        }
     }
 }
 

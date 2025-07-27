@@ -1,5 +1,4 @@
 #include <cstdint>
-#include <cstdlib>
 
 #include "ppu.hpp"
 #include "utils.hpp"
@@ -48,15 +47,14 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
     
     case KEY_PPUADDR:
         // done in two reads : msb, then lsb
-        if (m_ppu_reg_w == 1) {
-            //we are reading the lsb
-            m_ppuaddr = (m_ppuaddr << 8) + static_cast<uint16_t>(value);
-            m_ppu_reg_w = 0;
-        } else {
+        if (m_ppu_reg_w == 0) {
             // msb, null the most signifants two bits (14 bit long addr space)
             m_ppuaddr = static_cast<uint16_t>(value & 0b00111111);
-            m_ppu_reg_w = 1;
+        } else {
+            //we are reading the lsb
+            m_ppuaddr = (m_ppuaddr << 8) + static_cast<uint16_t>(value);
         }
+        m_ppu_reg_w = !m_ppu_reg_w;
         break;
 
     case KEY_PPUDATA:
@@ -68,18 +66,11 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
         if (m_ppu_reg_w == 0) {
             // 1st write, we are reading X
             m_ppuscroll_x = value;
-            m_ppu_reg_w = 1;
-        } else if (m_ppu_reg_w) {
+        } else {
             // 2nd write, we are reading Y
             m_ppuscroll_y = value;
-            m_ppu_reg_w = 0;
         }
-        break;
-
-    case KEY_OAMADDR:
-        break;
-
-    case KEY_OAMDATA:
+        m_ppu_reg_w = !m_ppu_reg_w;
         break;
 
     case KEY_OAMDMA:
@@ -89,6 +80,10 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
             m_ppuoam[i] = m_cpu_ram->get(oamdma_source_addr + i);
         }
         break;
+
+    case KEY_OAMADDR:
+        // oamdata is not implemented yet, so m_ppu_oam_addr is useless for now
+        m_ppu_oam_addr = value;
 
     case KEY_CTRL1:
         m_controller_strobe = (value & 1); // get lsb
@@ -123,8 +118,8 @@ uint8_t PpuDevice::get(uint16_t addr) {
         break;
     
     case KEY_PPUSTATUS:
-        // TODO : implement PPUSTATUS for real
-        retval = 0b10000000 | m_ppustatus;
+        retval = m_ppustatus;
+        // reset w register (PUSTATUS read side effect)
         m_ppu_reg_w = 0;
         break;
     
@@ -159,8 +154,6 @@ void PpuDevice::tick() {
             if (scanline_no%8 == 0) {
                 // render background batch of 8 lines
                 render_nametable_line(scanline_no / 8);
-                m_dbg_string.append(std::to_string((int)(m_ppuctrl & 0b11)));
-                m_dbg_string.append(" ");
             }
             render_oam_line(scanline_no);
         }
@@ -170,8 +163,7 @@ void PpuDevice::tick() {
             // Let's finish rendering the frame
             // render_oam();
             saveFrame();
-            // std::cout << "DBGSCROLL " << m_dbg_string << std::endl;
-            m_dbg_string = "";
+            m_ppustatus |= PPUSTATUS_VBLANK;
 
             // TODO : should not be byte_not a macro or something so it gets notted at compil and not runtime ?
             // TODO : check we are resetting SPRITE0 collision flag at the right moment
@@ -179,7 +171,10 @@ void PpuDevice::tick() {
                 m_cpu->interrupt(false);
             }
         } else if (scanline_no == SCANLINE_FLAG_CLEAR) {
+            // clear vblank ans sprite 0 collision
+            // TODO : clear also sprite overflow
             m_ppustatus &= byte_not(PPUSTATUS_SPRITE0_COLLISION);
+            m_ppustatus &= byte_not(PPUSTATUS_VBLANK);
         }
     }
     m_ntick += 1;
