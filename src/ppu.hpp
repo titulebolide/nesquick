@@ -57,11 +57,12 @@ private:
 
     uint8_t m_vram[0x4000] = {0}; // 14 bit addr space
     uint32_t m_ntick = 0;
-    uint8_t m_ppu_reg_w = 0; // First or second write toggle
+    bool m_ppu_reg_w = 0; // First or second write toggle (0 or 1)
     uint16_t m_ppuaddr = 0; // PPU register V
     uint8_t m_ppuctrl = 0;
     uint8_t m_ppustatus = 0;
     uint8_t m_ppuoam[256] = {0};
+    uint8_t m_ppu_oam_addr = 0;
     uint8_t m_ppudata_buffer = 0; // ppudata does not read directly ram but a buffer that is updated after each read
 
     uint8_t m_ppuscroll_x = 0;

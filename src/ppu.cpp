@@ -48,15 +48,14 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
     
     case KEY_PPUADDR:
         // done in two reads : msb, then lsb
-        if (m_ppu_reg_w == 1) {
-            //we are reading the lsb
-            m_ppuaddr = (m_ppuaddr << 8) + static_cast<uint16_t>(value);
-            m_ppu_reg_w = 0;
-        } else {
+        if (m_ppu_reg_w == 0) {
             // msb, null the most signifants two bits (14 bit long addr space)
             m_ppuaddr = static_cast<uint16_t>(value & 0b00111111);
-            m_ppu_reg_w = 1;
+        } else {
+            //we are reading the lsb
+            m_ppuaddr = (m_ppuaddr << 8) + static_cast<uint16_t>(value);
         }
+        m_ppu_reg_w = !m_ppu_reg_w;
         break;
 
     case KEY_PPUDATA:
@@ -68,18 +67,11 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
         if (m_ppu_reg_w == 0) {
             // 1st write, we are reading X
             m_ppuscroll_x = value;
-            m_ppu_reg_w = 1;
-        } else if (m_ppu_reg_w) {
+        } else {
             // 2nd write, we are reading Y
             m_ppuscroll_y = value;
-            m_ppu_reg_w = 0;
         }
-        break;
-
-    case KEY_OAMADDR:
-        break;
-
-    case KEY_OAMDATA:
+        m_ppu_reg_w = !m_ppu_reg_w;
         break;
 
     case KEY_OAMDMA:
@@ -89,6 +81,10 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
             m_ppuoam[i] = m_cpu_ram->get(oamdma_source_addr + i);
         }
         break;
+
+    case KEY_OAMADDR:
+        // oamdata is not implemented yet, so m_ppu_oam_addr is useless for now
+        m_ppu_oam_addr = value;
 
     case KEY_CTRL1:
         m_controller_strobe = (value & 1); // get lsb
