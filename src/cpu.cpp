@@ -245,7 +245,8 @@ void Emu6502::in_de_mem(uint16_t addr, bool sign_plus) {
 
 void Emu6502::add_val_to_acc_carry(uint8_t val) {
     // use a uint16_t to detect for a carry
-    // TODO : maybe remove some of the static cast ? 
+    // TODO : maybe remove some of the static cast ?
+    bool same_sign_than_regA = (((val ^ regs[REG_A]) & BIT7) == 0);
     uint16_t bigval = static_cast<uint16_t>(val);
     if (get_status_bit(STATUS_CARRY)) {
         // there is a carry
@@ -256,6 +257,15 @@ void Emu6502::add_val_to_acc_carry(uint8_t val) {
     set_status_bit(STATUS_CARRY, bigval > 255);
     regs[REG_A] = static_cast<uint8_t>(bigval);
     update_zn_flag(regs[REG_A]);
+    if (same_sign_than_regA) {
+        // if the val and reg A were the same sign
+        // and val and the res are no longer the same sign
+        // we have an overflow
+        bool same_sign_than_result = (((val ^ regs[REG_A]) & BIT7) == 0);
+        set_status_bit(STATUS_OVFLO, !same_sign_than_result);
+    } else {
+        set_status_bit(STATUS_OVFLO, false);
+    }
 }
 
 void Emu6502::op_adc() {
