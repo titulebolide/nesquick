@@ -117,7 +117,11 @@ uint8_t PpuDevice::get(uint16_t addr) {
         // get buffer value
         retval = m_ppudata_buffer;
         // update buffer AFTER the read
-        m_ppudata_buffer = m_vram[m_ppuaddr];
+        if (m_ppuaddr < 0x2000) {
+            m_ppudata_buffer = m_chr_rom[m_ppuaddr];
+        } else {
+            m_ppudata_buffer = m_vram[0x1000 + (m_ppuaddr-0x1000)%0x1000];
+        }
         // increase ppuaddr after access
         inc_ppuaddr();
         break;
