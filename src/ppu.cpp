@@ -1,5 +1,4 @@
 #include <cstdint>
-#include <cstdlib>
 
 #include "ppu.hpp"
 #include "utils.hpp"

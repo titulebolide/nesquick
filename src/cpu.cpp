@@ -2,10 +2,6 @@
 #include <vector>
 #include <map>
 #include <stdexcept>
-#include <iomanip>
-#include <bitset>
-#include <thread>
-#include <chrono>
 
 #include "utils.hpp"
 #include "cpu.hpp"

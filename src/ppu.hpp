@@ -4,7 +4,6 @@
 
 #include "device.hpp"
 #include "cpu.hpp"
-#include <string>
 
 
 enum {

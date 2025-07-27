@@ -1,8 +1,6 @@
 #include "apu.hpp"
 #include "device.hpp"
 #include <cstdint>
-#include <iostream>
-#include <ostream>
 
 static float period_to_frequency(uint16_t period) {
     return CLOCK_FREQUENCY / (16.0f*( static_cast<float>(period) + 1));
