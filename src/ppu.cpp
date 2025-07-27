@@ -58,6 +58,10 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
         break;
 
     case KEY_PPUDATA:
+        if (m_ppuaddr == 0x3f00) {
+            // std::cout << "peuplaj vram val " << hexstr(value) << std::endl;
+            // sleep(2);
+        }
         m_vram[m_ppuaddr] = value;
         inc_ppuaddr();
         break;
@@ -100,6 +104,7 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
         m_apu->set(addr, value);
 
     default:
+        // std::cout << "UNIMPLEMENETED " << hexstr(addr) << std::endl;
         break;
     }
 }
@@ -363,27 +368,28 @@ bool PpuDevice::add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, ui
             } else { // vflip and hflip
                 pix_color = sprite[7-y][7-x];
             }
-            uint8_t r = 0;
-            uint8_t g = 0;
-            uint8_t b = 0; // TODO : set here transparent bg
+            uint8_t color_no;
             if (pix_color != 0) {
                 // 0x3f00 : palettes location in vram
                 // a palette : a set of 4 colors (4 bytes then)
                 // palette_no : the index of the palette in the palette list
                 // pix_color : the color in the palette
-                uint8_t color_no = m_vram[0x3f00 + static_cast<uint16_t>(palette_no) * 4 + static_cast<uint16_t>(pix_color)];
-                r = NES_COLORS[color_no][0]; // TODO : get pointer
-                g = NES_COLORS[color_no][1];
-                b = NES_COLORS[color_no][2];
-                cv::Vec3b bg_color = frame->at<cv::Vec3b>(sprite_y + y, sprite_x + x);
-                // TODO : same here,a lot of check for the sprite 0
-                if (check_collision && (bg_color[0] != 0 || bg_color[1] != 0 || bg_color[2] != 0)) {
-                    // background is set
-                    // TODO : do better, it relies on the background being black and nothing else being black
-                    sprite0_collision = true;
-                }
-            } else if (transparent_bg) {
+                color_no = m_vram[0x3f00 + static_cast<uint16_t>(palette_no) * 4 + static_cast<uint16_t>(pix_color)];
+            } else if (!transparent_bg) {
+                color_no = m_vram[0x3f00];
+                // std::cout << (int) color_no << std::endl;
+            } else {
                 continue;
+            }
+            uint8_t r = NES_COLORS[color_no][0]; // TODO : get pointer
+            uint8_t g = NES_COLORS[color_no][1];
+            uint8_t b = NES_COLORS[color_no][2];
+            cv::Vec3b bg_color = frame->at<cv::Vec3b>(sprite_y + y, sprite_x + x);
+            // TODO : same here,a lot of check for the sprite 0
+            if (check_collision && (bg_color[0] != 0 || bg_color[1] != 0 || bg_color[2] != 0)) {
+                // background is set
+                // TODO : do better, it relies on the background being black and nothing else being black
+                sprite0_collision = true;
             }
             // TODO there are fatser ways to populate a frame
             frame->at<cv::Vec3b>(sprite_y + y, sprite_x + x) = cv::Vec3b(r, g, b);
@@ -398,31 +404,28 @@ bool PpuDevice::add_sprite_line(uint8_t sprite_no, bool table_no, uint8_t sprite
     get_sprite_line(sprite, sprite_no, table_no, sprite_line, hflip, vflip);
     bool sprite0_collision = false;
     for (uint8_t x = 0; x < 8; x++) {
-        // if (sprite_x + x >= 256) {
-        //     continue;
-        // }
         uint8_t pix_color = sprite[x];
-        uint8_t r = 0;
-        uint8_t g = 0;
-        uint8_t b = 0; // TODO : set here transparent bg
+        uint8_t color_no;
         if (pix_color != 0) {
             // 0x3f00 : palettes location in vram
             // a palette : a set of 4 colors (4 bytes then)
             // palette_no : the index of the palette in the palette list
             // pix_color : the color in the palette
-            uint8_t color_no = m_vram[0x3f00 + static_cast<uint16_t>(palette_no) * 4 + static_cast<uint16_t>(pix_color)];
-            r = NES_COLORS[color_no][0]; // TODO : get pointer
-            g = NES_COLORS[color_no][1];
-            b = NES_COLORS[color_no][2];
-            cv::Vec3b bg_color = m_next_frame.at<cv::Vec3b>(sprite_y + sprite_line, sprite_x + x);
-            // TODO : same here,a lot of check for the sprite 0
-            if (check_collision && (bg_color[0] != 0 || bg_color[1] != 0 || bg_color[2] != 0)) {
-                // background is set
-                // TODO : do better, it relies on the background being black and nothing else being black
-                sprite0_collision = true;
-            }
-        } else if (transparent_bg) {
+            color_no = m_vram[0x3f00 + static_cast<uint16_t>(palette_no) * 4 + static_cast<uint16_t>(pix_color)];
+        } else if (!transparent_bg) {
+            color_no = m_vram[0x3f00];
+        } else {
             continue;
+        }
+        uint8_t r = NES_COLORS[color_no][0]; // TODO : get pointer
+        uint8_t g = NES_COLORS[color_no][1];
+        uint8_t b = NES_COLORS[color_no][2];
+        cv::Vec3b bg_color = m_next_frame.at<cv::Vec3b>(sprite_y + sprite_line, sprite_x + x);
+        // TODO : same here,a lot of check for the sprite 0
+        if (check_collision && (bg_color[0] != 0 || bg_color[1] != 0 || bg_color[2] != 0)) {
+            // background is set
+            // TODO : do better, it relies on the background being black and nothing else being black
+            sprite0_collision = true;
         }
         // TODO there are fatser ways to populate a frame
         m_next_frame.at<cv::Vec3b>(sprite_y + sprite_line, sprite_x + x) = cv::Vec3b(r, g, b);

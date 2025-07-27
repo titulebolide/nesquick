@@ -50,14 +50,14 @@ std::string binstr(uint8_t value) {
 
 std::string hexstr(uint8_t value) {
     std::stringstream ss;
-    ss << std::setw(2) << std::setfill('0')
+    ss << std::uppercase << std::setw(2) << std::setfill('0')
        << std::hex << static_cast<int>(value);
     return ss.str();
 }
 
 std::string hexstr(uint16_t value) {
     std::stringstream ss;
-    ss << std::setw(4) << std::setfill('0')
+    ss << std::uppercase << std::setw(4) << std::setfill('0')
        << std::hex << static_cast<int>(value);
     return ss.str();
 }
