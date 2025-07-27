@@ -126,6 +126,7 @@ uint8_t PpuDevice::get(uint16_t addr) {
         retval = m_ppustatus;
         // reset w register (PUSTATUS read side effect)
         m_ppu_reg_w = 0;
+        m_ppustatus &= byte_not(PPUSTATUS_VBLANK);
         break;
     
     case KEY_CTRL1:
