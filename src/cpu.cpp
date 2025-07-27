@@ -10,6 +10,8 @@
 #include "utils.hpp"
 #include "cpu.hpp"
 
+#define DEBUG_TYPE_MESEN true
+
 Emu6502::Emu6502(Memory *mem, bool debug, LstDebuggerAsm6 *lst)
     : m_debug(debug), mem(mem), lst(lst) {
     regs[REG_SP] = 0xff;
@@ -414,15 +416,20 @@ void Emu6502::dbg() {
     if (prgm_ctr == 0) {
         return;
     }
-    std::string inst = "";
-    if (lst != nullptr) {
-        inst = lst->getInst(prgm_ctr);
-    }
-    std::cout << "\nPC\tinst\tA\tX\tY\tSP\tNV-BDIZC\n";
-    std::cout << std::hex << prgm_ctr << "\t" << hex2(mem->get(prgm_ctr)) << "\t" << hex2(regs[REG_A]) << "\t" << hex2(regs[REG_X]) << "\t" << hex2(regs[REG_Y]) << "\t" << hex2(stack_ptr) << "\t" << bin8(regs[REG_S]) << "\n";
-    std::cout << inst << std::endl;
-    if (inst.find("bkpt") != std::string::npos) {
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+    if (DEBUG_TYPE_MESEN) {
+        // Matching Mesen custom format : A:[A,2h] X:[X,2h] Y:[Y,2h] S:[SP,2h] P:[P,8]
+        std::cout << hexstr(prgm_ctr) << "  A:" << hexstr(regs[REG_A]) << " X:" << hexstr(regs[REG_X]) << " Y:" << hexstr(regs[REG_Y]) << " SP:" << hexstr(regs[REG_SP]) << " S:" << hexstr(regs[REG_S]) << std::endl;
+    } else {
+        std::string inst = "";
+        if (lst != nullptr) {
+            inst = lst->getInst(prgm_ctr);
+        }
+        std::cout << "\nPC\tinst\tA\tX\tY\tSP\tNV-BDIZC\n";
+        std::cout << std::hex << prgm_ctr << "\t" << hex2(mem->get(prgm_ctr)) << "\t" << hex2(regs[REG_A]) << "\t" << hex2(regs[REG_X]) << "\t" << hex2(regs[REG_Y]) << "\t" << hex2(regs[REG_SP]) << "\t" << bin8(regs[REG_S]) << "\n";
+        std::cout << inst << std::endl;
+        if (inst.find("bkpt") != std::string::npos) {
+            sleep(2);
+        }
     }
 }
 

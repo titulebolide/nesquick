@@ -5,11 +5,17 @@
 #include <cstdint>
 #include <iomanip>
 #include <bitset>
+#include <thread>
+#include <chrono>
 #include "utils.hpp"
 
 // Utility functions
 uint8_t byte_not(uint8_t val) {
     return ~val;
+}
+
+void sleep(int sec) {
+    std::this_thread::sleep_for(std::chrono::seconds(sec));
 }
 
 std::string dec2hex(uint16_t val) {
