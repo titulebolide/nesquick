@@ -76,6 +76,8 @@ private:
     cv::Mat m_next_frame; // frame that we are building
     cv::Mat m_last_frame; // last frame that we built
 
+    uint8_t m_last_bus_value = 0;
+
     bool get_ppuctrl_bit(uint8_t status_bit);
 
     void inc_ppuaddr();

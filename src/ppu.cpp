@@ -33,6 +33,7 @@ void PpuDevice::inc_ppuaddr() {
 
 void PpuDevice::set(uint16_t addr, uint8_t value) {
     if (addr < 0x4000) {
+        m_last_bus_value = value;
         addr = ((addr - 0x2000) % 8) + 0x2000; // mirroring every 8 bits
     }
     uint16_t oamdma_source_addr;
@@ -110,6 +111,12 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
 }
 
 uint8_t PpuDevice::get(uint16_t addr) {
+    bool update_last_bus_value = false;
+    if (addr < 0x4000) {
+        update_last_bus_value = true;
+        addr = ((addr - 0x2000) % 8) + 0x2000; // mirroring every 8 bits
+    }
+
     uint8_t retval;
     uint8_t controller_state;
     switch (addr) {
@@ -127,7 +134,10 @@ uint8_t PpuDevice::get(uint16_t addr) {
         break;
     
     case KEY_PPUSTATUS:
-        retval = m_ppustatus;
+        // keep only the three high bits
+        // set the lower bits to the reminiscient of the bus (open bus)
+        retval = (m_ppustatus & (BIT7|BIT6|BIT5)) | (m_last_bus_value & (BIT4|BIT3|BIT2|BIT1|BIT0));
+
         // reset w register (PUSTATUS read side effect)
         m_ppu_reg_w = 0;
         m_ppustatus &= byte_not(PPUSTATUS_VBLANK);
@@ -150,6 +160,9 @@ uint8_t PpuDevice::get(uint16_t addr) {
         
     default:
         break;
+    }
+    if (update_last_bus_value) {
+        m_last_bus_value = retval;
     }
     return retval;
 }
@@ -311,6 +324,7 @@ void PpuDevice::dbg_render_fullnametable(cv::Mat * dbg_frame) {
 }
 
 // renders the various sprites
+// used for OAM render
 void PpuDevice::render_oam_line(uint8_t line_no) {
     
     bool spritesize = get_ppuctrl_bit(PPUCTRL_SPRITESIZE);
@@ -349,6 +363,7 @@ void PpuDevice::render_oam_line(uint8_t line_no) {
     }
 }
 
+// used for BG render
 bool PpuDevice::add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, uint16_t sprite_x, uint16_t sprite_y, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision) { //(self, sprite_no, sprite_table_no, frame, spritex, spritey, palette_no, palettes, hflip, vflip):
     // palette = palettes[palette_no*4:palette_no*4 + 4]
     uint8_t sprite[8][8];
