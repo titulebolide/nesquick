@@ -403,7 +403,7 @@ bool PpuDevice::add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, ui
                 // pix_color : the color in the palette
                 color_no = m_vram[0x3f00 + static_cast<uint16_t>(palette_no) * 4 + static_cast<uint16_t>(pix_color)];
             } else if (!transparent_bg) {
-                color_no = m_vram[0x3f00];
+                color_no = m_vram[0x3f10];
                 // std::cout << (int) color_no << std::endl;
             } else {
                 continue;
@@ -440,7 +440,7 @@ bool PpuDevice::add_sprite_line(uint8_t sprite_no, bool table_no, uint8_t sprite
             // pix_color : the color in the palette
             color_no = m_vram[0x3f00 + static_cast<uint16_t>(palette_no) * 4 + static_cast<uint16_t>(pix_color)];
         } else if (!transparent_bg) {
-            color_no = m_vram[0x3f00];
+            color_no = m_vram[0x3f10];
         } else {
             continue;
         }
