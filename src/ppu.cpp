@@ -123,8 +123,12 @@ uint8_t PpuDevice::get(uint16_t addr) {
         // update buffer AFTER the read
         if (m_ppuaddr < 0x2000) {
             m_ppudata_buffer = m_chr_rom[m_ppuaddr];
-        } else {
+        } else if (m_ppuaddr < 0x3F00) {
             m_ppudata_buffer = m_vram[0x1000 + (m_ppuaddr-0x1000)%0x1000];
+        } else if (m_ppuaddr < 0x4000) {
+            m_ppudata_buffer = m_vram[0x1000 + (m_ppuaddr-0x1000)%0x1000];
+        } else {
+            std::cerr << "Invalid vram addr" << std::endl;
         }
         // increase ppuaddr after access
         inc_ppuaddr();
