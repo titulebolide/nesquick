@@ -159,6 +159,10 @@ uint8_t PpuDevice::get(uint16_t addr) {
         }
         break;
         
+    case KEY_CTRL2:
+        retval = 0x40;
+        break;
+
     default:
         break;
     }
