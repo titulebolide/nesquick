@@ -199,8 +199,9 @@ void PpuDevice::tick() {
                 m_cpu->interrupt(false);
             }
         } else if (scanline_no == SCANLINE_FLAG_CLEAR) {
-            // clear vblank ans sprite 0 collision
+            // clear vblank and sprite 0 collision
             // TODO : clear also sprite overflow
+            m_ppustatus &= byte_not(PPUSTATUS_OVERFLOW);
             m_ppustatus &= byte_not(PPUSTATUS_SPRITE0_COLLISION);
             m_ppustatus &= byte_not(PPUSTATUS_VBLANK);
         }
