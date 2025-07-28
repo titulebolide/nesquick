@@ -273,7 +273,7 @@ void PpuDevice::render_nametable_line(uint8_t screen_sprite_y) {
         if (screen_sprite_x >= 1) {
           actual_x_shift = x_shift;
         }
-        bool collision = add_sprite(&m_next_frame, sprite_no, table_no, screen_sprite_x*8-actual_x_shift, screen_sprite_y*8-y_shift, palette_no, false, false, false, false);
+        add_sprite(&m_next_frame, sprite_no, table_no, screen_sprite_x*8-actual_x_shift, screen_sprite_y*8-y_shift, palette_no, false, false, false);
     }
 }
 
@@ -316,7 +316,7 @@ void PpuDevice::dbg_render_fullnametable(cv::Mat * dbg_frame) {
             }
             uint8_t palette_no = ((m_vram[nametable_base_addr + attribute_table_addr] >> attr_bitshift) & 0b11);
             bool table_no = 1; //get_ppuctrl_bit(PPUCTRL_BGPATTTABLE);
-            bool collision = add_sprite(dbg_frame, sprite_no, table_no, screen_sprite_x*8, screen_sprite_y*8, palette_no, false, false, false, false);
+            add_sprite(dbg_frame, sprite_no, table_no, screen_sprite_x*8, screen_sprite_y*8, palette_no, false, false, false);
         }
     }
 
@@ -371,7 +371,7 @@ void PpuDevice::render_oam_line(uint8_t line_no) {
 }
 
 // used for BG render
-bool PpuDevice::add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, uint16_t sprite_x, uint16_t sprite_y, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision) { //(self, sprite_no, sprite_table_no, frame, spritex, spritey, palette_no, palettes, hflip, vflip):
+void PpuDevice::add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, uint16_t sprite_x, uint16_t sprite_y, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg) { //(self, sprite_no, sprite_table_no, frame, spritex, spritey, palette_no, palettes, hflip, vflip):
     // palette = palettes[palette_no*4:palette_no*4 + 4]
     uint8_t sprite[8][8];
     get_sprite(sprite, sprite_no, table_no, false);
@@ -411,18 +411,10 @@ bool PpuDevice::add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, ui
             uint8_t r = NES_COLORS[color_no][0]; // TODO : get pointer
             uint8_t g = NES_COLORS[color_no][1];
             uint8_t b = NES_COLORS[color_no][2];
-            cv::Vec3b bg_color = frame->at<cv::Vec3b>(sprite_y + y, sprite_x + x);
-            // TODO : same here,a lot of check for the sprite 0
-            if (check_collision && (bg_color[0] != 0 || bg_color[1] != 0 || bg_color[2] != 0)) {
-                // background is set
-                // TODO : do better, it relies on the background being black and nothing else being black
-                sprite0_collision = true;
-            }
             // TODO there are fatser ways to populate a frame
             frame->at<cv::Vec3b>(sprite_y + y, sprite_x + x) = cv::Vec3b(r, g, b);
         }
     }
-    return sprite0_collision;
 }
 
 bool PpuDevice::add_sprite_line(uint8_t sprite_no, bool table_no, uint8_t sprite_x, uint8_t sprite_y, uint8_t sprite_line, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision) { //(self, sprite_no, sprite_table_no, frame, spritex, spritey, palette_no, palettes, hflip, vflip):
@@ -430,6 +422,10 @@ bool PpuDevice::add_sprite_line(uint8_t sprite_no, bool table_no, uint8_t sprite
     uint8_t sprite[8];
     get_sprite_line(sprite, sprite_no, table_no, sprite_line, hflip, vflip);
     bool sprite0_collision = false;
+    uint8_t bg_color_no = m_vram[0x3f10];
+    uint8_t bg_color_r = NES_COLORS[bg_color_no][0];
+    uint8_t bg_color_g = NES_COLORS[bg_color_no][1];
+    uint8_t bg_color_b = NES_COLORS[bg_color_no][2];
     for (uint8_t x = 0; x < 8; x++) {
         uint8_t pix_color = sprite[x];
         uint8_t color_no;
@@ -449,7 +445,7 @@ bool PpuDevice::add_sprite_line(uint8_t sprite_no, bool table_no, uint8_t sprite
         uint8_t b = NES_COLORS[color_no][2];
         cv::Vec3b bg_color = m_next_frame.at<cv::Vec3b>(sprite_y + sprite_line, sprite_x + x);
         // TODO : same here,a lot of check for the sprite 0
-        if (check_collision && (bg_color[0] != 0 || bg_color[1] != 0 || bg_color[2] != 0)) {
+        if (check_collision && (bg_color[0] != bg_color_r && bg_color[1] != bg_color_g && bg_color[2] != bg_color_b)) {
             // background is set
             // TODO : do better, it relies on the background being black and nothing else being black
             sprite0_collision = true;
