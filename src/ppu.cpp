@@ -44,6 +44,7 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
         break;
     
     case KEY_PPUMASK:
+        m_ppumask = value;
         break;
     
     case KEY_PPUADDR:
@@ -59,10 +60,6 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
         break;
 
     case KEY_PPUDATA:
-        if (m_ppuaddr == 0x3f00) {
-            // std::cout << "peuplaj vram val " << hexstr(value) << std::endl;
-            // sleep(2);
-        }
         m_vram[m_ppuaddr] = value;
         inc_ppuaddr();
         break;
@@ -354,7 +351,8 @@ void PpuDevice::render_oam_line(uint8_t line_no) {
         bool collision;
         if (i==0 && line_no >= 2) {
             collision = add_sprite_line(sprite_no, table_no, sprite_x, sprite_y, line_no - sprite_y, palette_no, hflip, vflip, true, true);
-            if (collision) {
+            if (collision && 
+                ((m_ppumask & (PPUMASK_ENABLE_BG|PPUMASK_ENABLE_SPRITE))==(PPUMASK_ENABLE_BG|PPUMASK_ENABLE_SPRITE))) {
                 m_ppustatus |= PPUSTATUS_SPRITE0_COLLISION;
             }
         } else {
