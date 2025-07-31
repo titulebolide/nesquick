@@ -24,14 +24,63 @@ bool PpuDevice::get_ppuctrl_bit(uint8_t status_bit) {
 }
 
 void PpuDevice::inc_ppuaddr() {
-    if (get_ppuctrl_bit(PPUCTRL_VRAMINC)) {
-        m_ppuaddr += 32;
+    /*
+    Outside of rendering, reads from or writes to $2007 will add either 1 or 32 
+    to v depending on the VRAM increment bit set via $2000. During rendering (on
+    the pre-render line and the visible lines 0-239, provided either background 
+    or sprite rendering is enabled), it will update v in an odd way, triggering 
+    a coarse X increment and a Y increment simultaneously
+    */
+    uint16_t scanline_no = m_ntick / SCANLINE_LENGHT;
+    if (SCANLINE_LAST_VISIBLE < scanline_no && scanline_no < SCANLINE_PRE_RENDER) {
+        // outside rendering
+        // quite normal ppu addr incr
+        if (get_ppuctrl_bit(PPUCTRL_VRAMINC)) {
+            m_ppuaddr += 32;
+            m_ppu_reg_v += 32;
+        } else {
+            m_ppuaddr += 1;
+            m_ppu_reg_v += 1;
+        }
     } else {
-        m_ppuaddr += 1;
+        // TODO : check rendering is enabled
+        coarse_x_incr();
+        y_incr();
     }
 }
 
+void PpuDevice::coarse_x_incr() {
+    if ((m_ppu_reg_v & 0x001F) == 31) {
+        // if coarse X == 31
+        m_ppu_reg_v &= ~0x001F;          // coarse X = 0
+        m_ppu_reg_v ^= 0x0400;           // switch horizontal nametable
+    } else {
+        m_ppu_reg_v += 1;
+    }
+}
+
+void PpuDevice::y_incr() {
+    if ((m_ppu_reg_v & 0x7000) != 0x7000) {
+        // if fine Y < 7
+        m_ppu_reg_v += 0x1000;                      // increment fine Y
+    } else {
+        m_ppu_reg_v &= ~0x7000;                     // fine Y = 0
+        uint16_t y = (m_ppu_reg_v & 0x03E0) >> 5;        // let y = coarse Y
+        if (y == 29) {
+            y = 0;                          // coarse Y = 0
+            m_ppu_reg_v ^= 0x0800;                    // switch vertical nametable
+        } else if (y == 31) {
+            y = 0;                          // coarse Y = 0, nametable not switched
+        } else {
+            y += 1;                         // increment coarse Y
+        }
+        m_ppu_reg_v = (m_ppu_reg_v & ~0x03E0) | (y << 5);     // put coarse Y back into v
+    }
+}
+
+// https://www.nesdev.org/wiki/PPU_scrolling
 void PpuDevice::set(uint16_t addr, uint8_t value) {
+    uint16_t value16b = static_cast<uint16_t>(value);
     if (addr < 0x4000) {
         m_last_bus_value = value;
         addr = ((addr - 0x2000) % 8) + 0x2000; // mirroring every 8 bits
@@ -40,7 +89,22 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
     switch (addr)
     {
     case KEY_PPUCTRL:
+        // t: ...GH.. ........ <- d: ......GH
+        //    <used elsewhere> <- d: ABCDEF..
+        
+        if ((m_ppuctrl & 0b11) != (value & 0b11) ) {
+
+            uint16_t scanline_no = m_ntick / SCANLINE_LENGHT;
+            uint16_t column_no = m_ntick % SCANLINE_LENGHT;
+            // std::cout << "nametable set to " << (int) (value & 0b11) << " frame " << m_n_frame << " scanline " << (int) scanline_no << " column " << (int) column_no << std::endl;
+            // m_cpu->dbg();
+
+            // sleep(2);
+        }
         m_ppuctrl = value;
+
+        clear_bits(&m_ppu_reg_t, BIT10|BIT11);
+        m_ppu_reg_t |= (value & 0b11) << 10;
         break;
     
     case KEY_PPUMASK:
@@ -50,12 +114,32 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
     case KEY_PPUADDR:
         // done in two reads : msb, then lsb
         if (m_ppu_reg_w == 0) {
+            // t: .CDEFGH ........ <- d: ..CDEFGH
+            //        <unused>     <- d: AB......
+            // t: Z...... ........ <- 0 (bit Z is cleared)
+            // w:                  <- 1
+
             // msb, null the most signifants two bits (14 bit long addr space)
-            m_ppuaddr = static_cast<uint16_t>(value & 0b00111111);
+            m_ppuaddr = value16b & 0b00111111;
+
+            // only bits 8->14 are set by value but bit 15 is also cleared 
+            clear_bits(&m_ppu_reg_t, 0b1111111100000000);
+            m_ppu_reg_t |= (value16b & 0b00111111) << 8;
+
         } else {
+            // t: ....... ABCDEFGH <- d: ABCDEFGH
+            // v: <...all bits...> <- t: <...all bits...>
+            // w:                  <- 0
+
             //we are reading the lsb
-            m_ppuaddr = (m_ppuaddr << 8) + static_cast<uint16_t>(value);
+            m_ppuaddr = (m_ppuaddr << 8) + value16b;
+
+            clear_bits(&m_ppu_reg_t, 0b11111111);
+            m_ppu_reg_t |= value16b;
+
+            m_ppu_reg_v = m_ppu_reg_t;
         }
+        // flip w
         m_ppu_reg_w = !m_ppu_reg_w;
         break;
 
@@ -66,18 +150,37 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
 
     case KEY_PPUSCROLL:
         if (m_ppu_reg_w == 0) {
+            // t: ....... ...ABCDE <- d: ABCDE...
+            // x:              FGH <- d: .....FGH
+            // w:                  <- 1
+
             // 1st write, we are reading X
-            m_ppuscroll_x = value;
+            m_ppuscroll_x = value16b;
+
+            clear_bits(&m_ppu_reg_t, 0b11111);
+            m_ppu_reg_t |= value16b >> 3;
+
+            m_ppu_reg_x = value & 0b111;
         } else {
+            // t: FGH..AB CDE..... <- d: ABCDEFGH
+            // w:                  <- 0
+
             // 2nd write, we are reading Y
             m_ppuscroll_y = value;
+
+            clear_bits(&m_ppu_reg_t, 0b0111001111100000);
+            // set FGH
+            m_ppu_reg_t |= (value16b & 0b111) << 12;
+            // set ABCDE
+            m_ppu_reg_t |= (value16b & 0b11111000) << 5;
         }
+        // flip w
         m_ppu_reg_w = !m_ppu_reg_w;
         break;
 
     case KEY_OAMDMA:
         // todo : emulate cpu cycles for DMA ?
-        oamdma_source_addr = (static_cast<uint16_t>(value) << 8);
+        oamdma_source_addr = (value16b << 8);
         for (uint16_t i = 0; i < 256; i ++) {
             m_ppuoam[i] = m_cpu_ram->get(oamdma_source_addr + i);
         }
@@ -135,6 +238,8 @@ uint8_t PpuDevice::get(uint16_t addr) {
         break;
     
     case KEY_PPUSTATUS:
+        // w:                  <- 0
+
         // keep only the three high bits
         // set the lower bits to the reminiscient of the bus (open bus)
         retval = (m_ppustatus & (BIT7|BIT6|BIT5)) | (m_last_bus_value & (BIT4|BIT3|BIT2|BIT1|BIT0));
@@ -172,9 +277,12 @@ uint8_t PpuDevice::get(uint16_t addr) {
     return retval;
 }
 
+// https://www.nesdev.org/w/images/default/4/4f/Ppu.svg
 void PpuDevice::tick() {
     uint16_t scanline_no = m_ntick / SCANLINE_LENGHT;
     uint16_t column_no = m_ntick % SCANLINE_LENGHT;
+
+    // TODO : turn this into a lookup table of pointer to exec function for matching columns
     if (column_no == 0) {
         // beginning of a new visible scanline
         if (scanline_no < SCANLINE_VBLANK_START) {
@@ -197,18 +305,42 @@ void PpuDevice::tick() {
             // TODO : check we are resetting SPRITE0 collision flag at the right moment
             if (get_ppuctrl_bit(PPUCTRL_VBLANKNMI)) {
                 m_cpu->interrupt(false);
+            } else {
+                std::cout << "no nmi" << std::endl;
             }
-        } else if (scanline_no == SCANLINE_FLAG_CLEAR) {
+        } else if (scanline_no == SCANLINE_PRE_RENDER) {
             // clear vblank and sprite 0 collision
             // TODO : clear also sprite overflow
             m_ppustatus &= byte_not(PPUSTATUS_OVERFLOW);
             m_ppustatus &= byte_not(PPUSTATUS_SPRITE0_COLLISION);
             m_ppustatus &= byte_not(PPUSTATUS_VBLANK);
         }
-    }
-    m_ntick += 1;
+    } else if (8 <= column_no && column_no <= 248 && column_no%8 == 0) {
+        coarse_x_incr();
+    } else if (column_no == 256) {
+        // https://www.nesdev.org/wiki/PPU_scrolling#At_dot_256_of_each_scanline
+        y_incr();
+        coarse_x_incr();
+    } else if (column_no == 257) {
+        // https://www.nesdev.org/wiki/PPU_scrolling#At_dot_257_of_each_scanline
+        // v: ....A.. ...BCDEF <- t: ....A.. ...BCDEF
+        m_ppu_reg_v |= m_ppu_reg_t & 0b0000010000011111;
+
+    } else if (280 <= column_no && column_no <= 304) {
+        // https://www.nesdev.org/wiki/PPU_scrolling#During_dots_280_to_304_of_the_pre-render_scanline_(end_of_vblank)
+        if (scanline_no == SCANLINE_PRE_RENDER) {
+            // v: GHIA.BC DEF..... <- t: GHIA.BC DEF.....
+            m_ppu_reg_v |= m_ppu_reg_t & 0b0111101111100000;
+        }
+    } else if (column_no == 328) {
+        coarse_x_incr();
+    } else if (column_no == 336) {
+        coarse_x_incr();
+    } 
+    m_ntick++;
     if (m_ntick == SCANLINE_NUMBER * SCANLINE_LENGHT) {
         m_ntick = 0;
+        m_n_frame++;
     }
 }
 
@@ -223,9 +355,9 @@ void PpuDevice::render_nametable_line(uint8_t screen_sprite_y) {
         uint16_t sprite_x = screen_sprite_x + static_cast<uint16_t>(m_ppuscroll_x/8);
         uint16_t sprite_y = screen_sprite_y + static_cast<uint16_t>(m_ppuscroll_y/8);
         uint16_t nametable_no = m_ppuctrl & 0b11;  
-        if (screen_sprite_y <= 3) {
-          nametable_no = 0;
-        }
+        // if (screen_sprite_y <= 3) {
+        //   nametable_no = 0;
+        // }
         if (sprite_y >= 30) {
             // crossing vertically the nametables
             sprite_y -= 30;
@@ -445,7 +577,7 @@ bool PpuDevice::add_sprite_line(uint8_t sprite_no, bool table_no, uint8_t sprite
         uint8_t b = NES_COLORS[color_no][2];
         cv::Vec3b bg_color = m_next_frame.at<cv::Vec3b>(sprite_y + sprite_line, sprite_x + x);
         // TODO : same here,a lot of check for the sprite 0
-        if (check_collision && (bg_color[0] != bg_color_r && bg_color[1] != bg_color_g && bg_color[2] != bg_color_b)) {
+        if (check_collision && (bg_color[0] != bg_color_r && bg_color[1] != bg_color_g && bg_color[2] != bg_color_b) || true) {
             // background is set
             // TODO : do better, it relies on the background being black and nothing else being black
             sprite0_collision = true;

@@ -45,7 +45,9 @@ const uint8_t NES_COLORS[64][3] = {{124, 124, 124}, {0, 0, 252}, {0, 0, 188}, {6
 const uint16_t SCANLINE_LENGHT = 341;
 const uint16_t SCANLINE_NUMBER = 262;
 const uint16_t SCANLINE_VBLANK_START = 241;
-const uint16_t SCANLINE_FLAG_CLEAR = 261;
+const uint16_t SCANLINE_PRE_RENDER = 261;
+const uint16_t SCANLINE_LAST_VISIBLE = 239;
+
 
 class PpuDevice : public Device {
 private:
@@ -64,6 +66,9 @@ private:
     uint8_t m_vram[0x4000] = {0}; // 14 bit addr space
     uint32_t m_ntick = 0;
     bool m_ppu_reg_w = 0; // First or second write toggle (0 or 1)
+    uint16_t m_ppu_reg_t = 0;
+    uint16_t m_ppu_reg_v = 0;
+    uint8_t m_ppu_reg_x = 0; // actually only 3 bits
     uint16_t m_ppuaddr = 0; // PPU register V
     uint8_t m_ppuctrl = 0;
     uint8_t m_ppumask = 0;
@@ -83,11 +88,15 @@ private:
     cv::Mat m_next_frame; // frame that we are building
     cv::Mat m_last_frame; // last frame that we built
 
+    long m_n_frame = 0;
+
     uint8_t m_last_bus_value = 0;
 
     bool get_ppuctrl_bit(uint8_t status_bit);
 
     void inc_ppuaddr();
+    void coarse_x_incr();
+    void y_incr();
     void add_sprite(cv::Mat *frame, uint8_t sprite_no, bool table_no, uint16_t sprite_x, uint16_t sprite_y, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg);
     bool add_sprite_line(uint8_t sprite_no, bool table_no, uint8_t sprite_x, uint8_t sprite_y, uint8_t sprite_line, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision);
     void get_sprite(uint8_t sprite[8][8], uint8_t sprite_no, bool table_no, bool doubletile);
