@@ -424,7 +424,7 @@ void Emu6502::dbg() {
     }
     if (DEBUG_TYPE_MESEN) {
         // Matching Mesen custom format : A:[A,2h] X:[X,2h] Y:[Y,2h] S:[SP,2h] P:[P,8]
-        std::cout << hexstr(prgm_ctr) << "  A:" << hexstr(regs[REG_A]) << " X:" << hexstr(regs[REG_X]) << " Y:" << hexstr(regs[REG_Y]) << " SP:" << hexstr(regs[REG_SP]) << " S:" << hexstr(regs[REG_S]) << std::endl;
+        std::cout << hexstr(prgm_ctr) << "  A:" << hexstr(regs[REG_A]) << " X:" << hexstr(regs[REG_X]) << " Y:" << hexstr(regs[REG_Y]) << " SP:" << hexstr(regs[REG_SP]) << " S:" << hexstr(regs[REG_S]) << " $0310:" << hexstr(mem->get(0X0301)) << " $0773:" << hexstr(mem->get(0X0773)) << std::endl;
     } else {
         std::string inst = "";
         if (lst != nullptr) {

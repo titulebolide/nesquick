@@ -17,7 +17,8 @@
 #include <signal.h>
 #include <map>
 
-#define DEBUG_WINDOW false
+#define DEBUG_WINDOW true
+#define LOG_DEBUG false
 
 typedef std::chrono::high_resolution_clock Clock;
 
@@ -222,7 +223,7 @@ int main() {
         {rom_base_addr, &rom},
     });
 
-    Emu6502 cpu(&mem, true, &lst);
+    Emu6502 cpu(&mem, LOG_DEBUG, &lst);
     ppu.set_cpu(&cpu); // urgh
     apu.set_cpu(&cpu); // urgh
 

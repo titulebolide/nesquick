@@ -88,6 +88,10 @@ private:
     cv::Mat m_next_frame; // frame that we are building
     cv::Mat m_last_frame; // last frame that we built
 
+    uint8_t m_nt_tile_x;
+    uint8_t m_nt_tile_y;
+
+
     long m_n_frame = 0;
 
     uint8_t m_last_bus_value = 0;
@@ -102,12 +106,13 @@ private:
     void get_sprite(uint8_t sprite[8][8], uint8_t sprite_no, bool table_no, bool doubletile);
 
     void get_sprite_line(uint8_t sprite[8], uint8_t sprite_no, bool table_no, uint8_t sprite_line, bool hflip, bool vflip);
-    
-    
-public:
     void render_oam();
     void render_oam_line(uint8_t line_no);
     void render_nametable_line(uint8_t screen_sprite_y);
+    void render_one_fucking_nametable_tile();
+    
+    
+public:
     void dbg_render_fullnametable(cv::Mat *dbg_frame);
     PpuDevice(uint8_t *chr_rom, Device *cpu_ram, Device *apu);
     uint8_t get(uint16_t addr);

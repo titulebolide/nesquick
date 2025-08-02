@@ -1,5 +1,4 @@
 #include <cstdint>
-
 #include "ppu.hpp"
 #include "utils.hpp"
 
@@ -287,10 +286,10 @@ void PpuDevice::tick() {
         // beginning of a new visible scanline
         if (scanline_no < SCANLINE_VBLANK_START) {
             // we are in a visible scanline
-            if (scanline_no%8 == 0) {
-                // render background batch of 8 lines
-                render_nametable_line(scanline_no / 8);
-            }
+            // if (scanline_no%8 == 0) {
+            //     // render background batch of 8 lines
+            //     render_nametable_line(scanline_no / 8);
+            // }
             render_oam_line(scanline_no);
         }
     } else if (column_no == 1) {
@@ -305,8 +304,6 @@ void PpuDevice::tick() {
             // TODO : check we are resetting SPRITE0 collision flag at the right moment
             if (get_ppuctrl_bit(PPUCTRL_VBLANKNMI)) {
                 m_cpu->interrupt(false);
-            } else {
-                std::cout << "no nmi" << std::endl;
             }
         } else if (scanline_no == SCANLINE_PRE_RENDER) {
             // clear vblank and sprite 0 collision
@@ -316,16 +313,30 @@ void PpuDevice::tick() {
             m_ppustatus &= byte_not(PPUSTATUS_VBLANK);
         }
     } else if (8 <= column_no && column_no <= 248 && column_no%8 == 0) {
-        coarse_x_incr();
+        if (scanline_no == SCANLINE_PRE_RENDER || scanline_no <= SCANLINE_LAST_VISIBLE) {
+            if (scanline_no%8 == 7) {
+                render_one_fucking_nametable_tile();
+            }
+            coarse_x_incr();
+        }
     } else if (column_no == 256) {
         // https://www.nesdev.org/wiki/PPU_scrolling#At_dot_256_of_each_scanline
-        y_incr();
-        coarse_x_incr();
+        if (scanline_no == SCANLINE_PRE_RENDER || scanline_no <= SCANLINE_LAST_VISIBLE) {
+            // if (scanline_no%8 == 7) {
+            //     render_one_fucking_nametable_tile();
+            // }
+            y_incr();
+            coarse_x_incr();
+        }
     } else if (column_no == 257) {
         // https://www.nesdev.org/wiki/PPU_scrolling#At_dot_257_of_each_scanline
         // v: ....A.. ...BCDEF <- t: ....A.. ...BCDEF
         m_ppu_reg_v |= m_ppu_reg_t & 0b0000010000011111;
 
+    }  else if (column_no == 258) {
+        if (scanline_no == SCANLINE_LAST_VISIBLE +1) {
+            std::cout << (int) column_no << " " << (int) scanline_no << " " << (int)m_nt_tile_x << " " << (int)m_nt_tile_y << std::endl;
+        }
     } else if (280 <= column_no && column_no <= 304) {
         // https://www.nesdev.org/wiki/PPU_scrolling#During_dots_280_to_304_of_the_pre-render_scanline_(end_of_vblank)
         if (scanline_no == SCANLINE_PRE_RENDER) {
@@ -333,9 +344,19 @@ void PpuDevice::tick() {
             m_ppu_reg_v |= m_ppu_reg_t & 0b0111101111100000;
         }
     } else if (column_no == 328) {
-        coarse_x_incr();
+        if (scanline_no == SCANLINE_PRE_RENDER || scanline_no <= SCANLINE_LAST_VISIBLE) {
+            // if (scanline_no%8 == 7) {
+            //     render_one_fucking_nametable_tile();
+            // }
+            coarse_x_incr();
+        }
     } else if (column_no == 336) {
-        coarse_x_incr();
+        if (scanline_no == SCANLINE_PRE_RENDER || scanline_no <= SCANLINE_LAST_VISIBLE) {
+            if (scanline_no%8 == 7) {
+                render_one_fucking_nametable_tile();
+            }
+            coarse_x_incr();
+        }
     } 
     m_ntick++;
     if (m_ntick == SCANLINE_NUMBER * SCANLINE_LENGHT) {
@@ -407,6 +428,35 @@ void PpuDevice::render_nametable_line(uint8_t screen_sprite_y) {
         }
         add_sprite(&m_next_frame, sprite_no, table_no, screen_sprite_x*8-actual_x_shift, screen_sprite_y*8-y_shift, palette_no, false, false, false);
     }
+}
+
+// renders the background
+void PpuDevice::render_one_fucking_nametable_tile() {
+    // x is left to right
+    // y is up to down
+    // but for imshow x is up to down, y is left to right
+    m_nt_tile_x ++;
+    if (m_nt_tile_x >= 32) {
+        m_nt_tile_x = 0;
+        m_nt_tile_y++;
+        if (m_nt_tile_y >= 30) {
+            m_nt_tile_y = 0;
+        }
+    }
+    uint8_t y_shift = 0; // (m_ppuscroll_y+1)%8;
+    uint8_t x_shift = m_ppuscroll_x % 8;
+
+    uint16_t tile_addr = 0x2000 | (m_ppu_reg_v & 0x0FFF);
+    uint16_t attr_addr = 0x23C0 | (m_ppu_reg_v & 0x0C00) | ((m_ppu_reg_v >> 4) & 0x38) | ((m_ppu_reg_v >> 2) & 0x07);
+    uint8_t sprite_no = m_vram[tile_addr];
+    uint8_t palette_no = 8; // ((m_vram[attr_addr] >> attr_bitshift) & 0b11);
+
+    bool table_no = get_ppuctrl_bit(PPUCTRL_BGPATTTABLE);
+    uint8_t actual_x_shift = 0;
+    if (m_nt_tile_x >= 1) {
+        actual_x_shift = x_shift;
+    }
+    add_sprite(&m_next_frame, sprite_no, table_no, m_nt_tile_x*8-actual_x_shift, m_nt_tile_y*8-y_shift, palette_no, false, false, false);
 }
 
 void PpuDevice::dbg_render_fullnametable(cv::Mat * dbg_frame) {
