@@ -88,10 +88,6 @@ private:
     cv::Mat m_next_frame; // frame that we are building
     cv::Mat m_last_frame; // last frame that we built
 
-    uint8_t m_nt_tile_x;
-    uint8_t m_nt_tile_y;
-
-
     long m_n_frame = 0;
 
     uint8_t m_last_bus_value = 0;
@@ -109,7 +105,7 @@ private:
     void render_oam();
     void render_oam_line(uint8_t line_no);
     void render_nametable_line(uint8_t screen_sprite_y);
-    void render_one_fucking_nametable_tile();
+    void render_one_fucking_nametable_tile(uint8_t sprite_x);
     
     
 public:

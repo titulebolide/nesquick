@@ -31,7 +31,7 @@ void PpuDevice::inc_ppuaddr() {
     a coarse X increment and a Y increment simultaneously
     */
     uint16_t scanline_no = m_ntick / SCANLINE_LENGHT;
-    if (SCANLINE_LAST_VISIBLE < scanline_no && scanline_no < SCANLINE_PRE_RENDER) {
+    if (SCANLINE_LAST_VISIBLE < scanline_no && scanline_no < SCANLINE_PRE_RENDER || true) { // TODO : why is this true fixing the dbg nametable (hence fixing the write in the vram) ? This makes no sense
         // outside rendering
         // quite normal ppu addr incr
         if (get_ppuctrl_bit(PPUCTRL_VRAMINC)) {
@@ -281,17 +281,10 @@ void PpuDevice::tick() {
     uint16_t scanline_no = m_ntick / SCANLINE_LENGHT;
     uint16_t column_no = m_ntick % SCANLINE_LENGHT;
 
-    // TODO : turn this into a lookup table of pointer to exec function for matching columns
+    // TODO : turn this into a lookup tab)le of pointer to exec function for matching columns
     if (column_no == 0) {
         // beginning of a new visible scanline
-        if (scanline_no < SCANLINE_VBLANK_START) {
-            // we are in a visible scanline
-            // if (scanline_no%8 == 0) {
-            //     // render background batch of 8 lines
-            //     render_nametable_line(scanline_no / 8);
-            // }
-            render_oam_line(scanline_no);
-        }
+
     } else if (column_no == 1) {
         if (scanline_no == SCANLINE_VBLANK_START) {
             // we are in the first tick of vblank
@@ -312,50 +305,45 @@ void PpuDevice::tick() {
             m_ppustatus &= byte_not(PPUSTATUS_SPRITE0_COLLISION);
             m_ppustatus &= byte_not(PPUSTATUS_VBLANK);
         }
-    } else if (8 <= column_no && column_no <= 248 && column_no%8 == 0) {
+    } else if (8 <= column_no && column_no <= 232 && column_no%8 == 0) {
         if (scanline_no == SCANLINE_PRE_RENDER || scanline_no <= SCANLINE_LAST_VISIBLE) {
-            if (scanline_no%8 == 7) {
-                render_one_fucking_nametable_tile();
-            }
-            coarse_x_incr();
+            render_one_fucking_nametable_tile(column_no/8+1);
         }
     } else if (column_no == 256) {
         // https://www.nesdev.org/wiki/PPU_scrolling#At_dot_256_of_each_scanline
         if (scanline_no == SCANLINE_PRE_RENDER || scanline_no <= SCANLINE_LAST_VISIBLE) {
-            // if (scanline_no%8 == 7) {
-            //     render_one_fucking_nametable_tile();
-            // }
             y_incr();
-            coarse_x_incr();
+            // probably uneeded
+            // coarse_x_incr();
         }
     } else if (column_no == 257) {
         // https://www.nesdev.org/wiki/PPU_scrolling#At_dot_257_of_each_scanline
         // v: ....A.. ...BCDEF <- t: ....A.. ...BCDEF
-        m_ppu_reg_v |= m_ppu_reg_t & 0b0000010000011111;
+        uint16_t filter = 0b0000010000011111;
+        m_ppu_reg_v = (m_ppu_reg_v & ~filter) | (m_ppu_reg_t & filter);
 
     }  else if (column_no == 258) {
+        if (scanline_no < SCANLINE_VBLANK_START) {
+            render_oam_line(scanline_no);
+        }
         if (scanline_no == SCANLINE_LAST_VISIBLE +1) {
-            std::cout << (int) column_no << " " << (int) scanline_no << " " << (int)m_nt_tile_x << " " << (int)m_nt_tile_y << std::endl;
+            // std::cout << (int) column_no << " " << (int) scanline_no << " " << (int)m_nt_tile_x << " " << (int)m_nt_tile_y << std::endl;
         }
     } else if (280 <= column_no && column_no <= 304) {
         // https://www.nesdev.org/wiki/PPU_scrolling#During_dots_280_to_304_of_the_pre-render_scanline_(end_of_vblank)
         if (scanline_no == SCANLINE_PRE_RENDER) {
             // v: GHIA.BC DEF..... <- t: GHIA.BC DEF.....
-            m_ppu_reg_v |= m_ppu_reg_t & 0b0111101111100000;
+            std::cout << "reg_t " << hexstr(m_ppu_reg_t) << std::endl;
+            uint16_t filter = 0b0111101111100000;
+            m_ppu_reg_v = (m_ppu_reg_v & ~filter) | (m_ppu_reg_t & filter);
         }
     } else if (column_no == 328) {
         if (scanline_no == SCANLINE_PRE_RENDER || scanline_no <= SCANLINE_LAST_VISIBLE) {
-            // if (scanline_no%8 == 7) {
-            //     render_one_fucking_nametable_tile();
-            // }
-            coarse_x_incr();
+            render_one_fucking_nametable_tile(0);
         }
     } else if (column_no == 336) {
         if (scanline_no == SCANLINE_PRE_RENDER || scanline_no <= SCANLINE_LAST_VISIBLE) {
-            if (scanline_no%8 == 7) {
-                render_one_fucking_nametable_tile();
-            }
-            coarse_x_incr();
+            render_one_fucking_nametable_tile(1);
         }
     } 
     m_ntick++;
@@ -431,32 +419,50 @@ void PpuDevice::render_nametable_line(uint8_t screen_sprite_y) {
 }
 
 // renders the background
-void PpuDevice::render_one_fucking_nametable_tile() {
+void PpuDevice::render_one_fucking_nametable_tile(uint8_t sprite_x) {
     // x is left to right
     // y is up to down
     // but for imshow x is up to down, y is left to right
-    m_nt_tile_x ++;
-    if (m_nt_tile_x >= 32) {
-        m_nt_tile_x = 0;
-        m_nt_tile_y++;
-        if (m_nt_tile_y >= 30) {
-            m_nt_tile_y = 0;
-        }
+
+    uint16_t scanline_no = m_ntick / SCANLINE_LENGHT;
+    uint16_t column_no = m_ntick % SCANLINE_LENGHT;
+
+    uint16_t fine_y = (scanline_no + 1)%261;
+    if (sprite_x < 2) {
+        fine_y += 1;
     }
-    uint8_t y_shift = 0; // (m_ppuscroll_y+1)%8;
+
+    if (fine_y % 8 != 7) {
+        // we output only every 8 lines (because we post by chunks of 8x8)
+        coarse_x_incr();
+        return;
+    }
+
+    uint8_t sprite_y = fine_y/8;
+
+    std::cout << (int)scanline_no << " " << (int) column_no << " "  << (int) sprite_x << " " << (int) sprite_y << std::endl;
+
     uint8_t x_shift = m_ppuscroll_x % 8;
 
     uint16_t tile_addr = 0x2000 | (m_ppu_reg_v & 0x0FFF);
+    uint16_t coarse_x = (m_ppu_reg_v & 0b11111);
+    uint16_t coarse_y = ((m_ppu_reg_v>>5) & 0b11111);
+
+    // std::cout << "column(x) " << column_no         << "   scanline(y) " << (int)scanline_no << "\n";
+    // std::cout << "x         " << (int) m_nt_tile_x << "   y          " << (int) m_nt_tile_y << "\n";
+    // std::cout << "addrx     " << (int) (coarse_x)  << "   addry      " << (int) (coarse_y) << " addr " << hexstr(tile_addr) << "\n" << std::endl;
+
     uint16_t attr_addr = 0x23C0 | (m_ppu_reg_v & 0x0C00) | ((m_ppu_reg_v >> 4) & 0x38) | ((m_ppu_reg_v >> 2) & 0x07);
     uint8_t sprite_no = m_vram[tile_addr];
     uint8_t palette_no = 8; // ((m_vram[attr_addr] >> attr_bitshift) & 0b11);
 
     bool table_no = get_ppuctrl_bit(PPUCTRL_BGPATTTABLE);
     uint8_t actual_x_shift = 0;
-    if (m_nt_tile_x >= 1) {
-        actual_x_shift = x_shift;
-    }
-    add_sprite(&m_next_frame, sprite_no, table_no, m_nt_tile_x*8-actual_x_shift, m_nt_tile_y*8-y_shift, palette_no, false, false, false);
+    // if (m_nt_tile_x >= 1) {
+    //     actual_x_shift = x_shift;
+    // }
+    add_sprite(&m_next_frame, sprite_no, table_no, sprite_x*8-actual_x_shift, sprite_y*8, palette_no, false, false, false);
+    coarse_x_incr();
 }
 
 void PpuDevice::dbg_render_fullnametable(cv::Mat * dbg_frame) {
@@ -609,6 +615,8 @@ bool PpuDevice::add_sprite_line(uint8_t sprite_no, bool table_no, uint8_t sprite
     uint8_t bg_color_g = NES_COLORS[bg_color_no][1];
     uint8_t bg_color_b = NES_COLORS[bg_color_no][2];
     for (uint8_t x = 0; x < 8; x++) {
+        uint8_t frame_y = (sprite_y + sprite_line) % (30*8);
+        uint8_t frame_x = (sprite_x + x) % (32*8);
         uint8_t pix_color = sprite[x];
         uint8_t color_no;
         if (pix_color != 0) {
@@ -625,7 +633,7 @@ bool PpuDevice::add_sprite_line(uint8_t sprite_no, bool table_no, uint8_t sprite
         uint8_t r = NES_COLORS[color_no][0]; // TODO : get pointer
         uint8_t g = NES_COLORS[color_no][1];
         uint8_t b = NES_COLORS[color_no][2];
-        cv::Vec3b bg_color = m_next_frame.at<cv::Vec3b>(sprite_y + sprite_line, sprite_x + x);
+        cv::Vec3b bg_color = m_next_frame.at<cv::Vec3b>(frame_y, frame_x);
         // TODO : same here,a lot of check for the sprite 0
         if (check_collision && (bg_color[0] != bg_color_r && bg_color[1] != bg_color_g && bg_color[2] != bg_color_b) || true) {
             // background is set
@@ -633,7 +641,7 @@ bool PpuDevice::add_sprite_line(uint8_t sprite_no, bool table_no, uint8_t sprite
             sprite0_collision = true;
         }
         // TODO there are fatser ways to populate a frame
-        m_next_frame.at<cv::Vec3b>(sprite_y + sprite_line, sprite_x + x) = cv::Vec3b(r, g, b);
+        m_next_frame.at<cv::Vec3b>(frame_y, frame_x) = cv::Vec3b(r, g, b);
     }
     return sprite0_collision;
 }
