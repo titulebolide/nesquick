@@ -432,15 +432,16 @@ void PpuDevice::render_one_fucking_nametable_tile(uint8_t sprite_x) {
         fine_y += 1;
     }
 
-    if (fine_y % 8 != 7) {
-        // we output only every 8 lines (because we post by chunks of 8x8)
-        coarse_x_incr();
-        return;
-    }
+    // if (fine_y % 8 != 7) {
+    //     // we output only every 8 lines (because we post by chunks of 8x8)
+    //     coarse_x_incr();
+    //     return;
+    // }
 
     uint8_t sprite_y = fine_y/8;
+    uint8_t sprite_line_no = fine_y % 8;
 
-    std::cout << (int)scanline_no << " " << (int) column_no << " "  << (int) sprite_x << " " << (int) sprite_y << std::endl;
+    std::cout << (int)scanline_no << " " << (int) column_no << " "  << (int) sprite_x << " " << (int) sprite_y << " " << (int) sprite_line_no << std::endl;
 
     uint8_t x_shift = m_ppuscroll_x % 8;
 
@@ -454,14 +455,25 @@ void PpuDevice::render_one_fucking_nametable_tile(uint8_t sprite_x) {
 
     uint16_t attr_addr = 0x23C0 | (m_ppu_reg_v & 0x0C00) | ((m_ppu_reg_v >> 4) & 0x38) | ((m_ppu_reg_v >> 2) & 0x07);
     uint8_t sprite_no = m_vram[tile_addr];
-    uint8_t palette_no = 8; // ((m_vram[attr_addr] >> attr_bitshift) & 0b11);
+    uint8_t attr_bitshift = 0;
+    if (sprite_y % 4 > 1) {
+        // bottom
+        attr_bitshift += 4;
+    }
+    if (sprite_x % 4 > 1) {
+        // right
+        attr_bitshift += 2;
+    }
+    uint8_t palette_no = ((m_vram[attr_addr] >> attr_bitshift) & 0b11);
 
     bool table_no = get_ppuctrl_bit(PPUCTRL_BGPATTTABLE);
     uint8_t actual_x_shift = 0;
     // if (m_nt_tile_x >= 1) {
     //     actual_x_shift = x_shift;
     // }
-    add_sprite(&m_next_frame, sprite_no, table_no, sprite_x*8-actual_x_shift, sprite_y*8, palette_no, false, false, false);
+    // add_sprite(&m_next_frame, sprite_no, table_no, sprite_x*8-actual_x_shift, sprite_y*8, palette_no, false, false, false);
+    add_sprite_line(sprite_no, table_no, sprite_x*8-actual_x_shift, sprite_y*8, sprite_line_no, palette_no, false, false, false, false);
+
     coarse_x_incr();
 }
 
