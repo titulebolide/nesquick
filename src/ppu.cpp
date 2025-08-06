@@ -36,10 +36,10 @@ void PpuDevice::inc_ppuaddr() {
         // quite normal ppu addr incr
         if (get_ppuctrl_bit(PPUCTRL_VRAMINC)) {
             m_ppuaddr += 32;
-            m_ppu_reg_v += 32;
+            m_reg_v += 32;
         } else {
             m_ppuaddr += 1;
-            m_ppu_reg_v += 1;
+            m_reg_v += 1;
         }
     } else {
         // TODO : check rendering is enabled
@@ -49,31 +49,31 @@ void PpuDevice::inc_ppuaddr() {
 }
 
 void PpuDevice::coarse_x_incr() {
-    if ((m_ppu_reg_v & 0x001F) == 31) {
+    if ((m_reg_v & 0x001F) == 31) {
         // if coarse X == 31
-        m_ppu_reg_v &= ~0x001F;          // coarse X = 0
-        m_ppu_reg_v ^= 0x0400;           // switch horizontal nametable
+        m_reg_v &= ~0x001F;          // coarse X = 0
+        m_reg_v ^= 0x0400;           // switch horizontal nametable
     } else {
-        m_ppu_reg_v += 1;
+        m_reg_v += 1;
     }
 }
 
 void PpuDevice::y_incr() {
-    if ((m_ppu_reg_v & 0x7000) != 0x7000) {
+    if ((m_reg_v & 0x7000) != 0x7000) {
         // if fine Y < 7
-        m_ppu_reg_v += 0x1000;                      // increment fine Y
+        m_reg_v += 0x1000;                      // increment fine Y
     } else {
-        m_ppu_reg_v &= ~0x7000;                     // fine Y = 0
-        uint16_t y = (m_ppu_reg_v & 0x03E0) >> 5;        // let y = coarse Y
+        m_reg_v &= ~0x7000;                     // fine Y = 0
+        uint16_t y = (m_reg_v & 0x03E0) >> 5;        // let y = coarse Y
         if (y == 29) {
             y = 0;                          // coarse Y = 0
-            m_ppu_reg_v ^= 0x0800;                    // switch vertical nametable
+            m_reg_v ^= 0x0800;                    // switch vertical nametable
         } else if (y == 31) {
             y = 0;                          // coarse Y = 0, nametable not switched
         } else {
             y += 1;                         // increment coarse Y
         }
-        m_ppu_reg_v = (m_ppu_reg_v & ~0x03E0) | (y << 5);     // put coarse Y back into v
+        m_reg_v = (m_reg_v & ~0x03E0) | (y << 5);     // put coarse Y back into v
     }
 }
 
@@ -102,8 +102,8 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
         }
         m_ppuctrl = value;
 
-        clear_bits(&m_ppu_reg_t, BIT10|BIT11);
-        m_ppu_reg_t |= (value & 0b11) << 10;
+        clear_bits(&m_reg_t, BIT10|BIT11);
+        m_reg_t |= (value & 0b11) << 10;
         break;
     
     case KEY_PPUMASK:
@@ -112,7 +112,7 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
     
     case KEY_PPUADDR:
         // done in two reads : msb, then lsb
-        if (m_ppu_reg_w == 0) {
+        if (m_reg_w == 0) {
             // t: .CDEFGH ........ <- d: ..CDEFGH
             //        <unused>     <- d: AB......
             // t: Z...... ........ <- 0 (bit Z is cleared)
@@ -122,8 +122,8 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
             m_ppuaddr = value16b & 0b00111111;
 
             // only bits 8->14 are set by value but bit 15 is also cleared 
-            clear_bits(&m_ppu_reg_t, 0b1111111100000000);
-            m_ppu_reg_t |= (value16b & 0b00111111) << 8;
+            clear_bits(&m_reg_t, 0b1111111100000000);
+            m_reg_t |= (value16b & 0b00111111) << 8;
 
         } else {
             // t: ....... ABCDEFGH <- d: ABCDEFGH
@@ -133,13 +133,13 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
             //we are reading the lsb
             m_ppuaddr = (m_ppuaddr << 8) + value16b;
 
-            clear_bits(&m_ppu_reg_t, 0b11111111);
-            m_ppu_reg_t |= value16b;
+            clear_bits(&m_reg_t, 0b11111111);
+            m_reg_t |= value16b;
 
-            m_ppu_reg_v = m_ppu_reg_t;
+            m_reg_v = m_reg_t;
         }
         // flip w
-        m_ppu_reg_w = !m_ppu_reg_w;
+        m_reg_w = !m_reg_w;
         break;
 
     case KEY_PPUDATA:
@@ -148,33 +148,32 @@ void PpuDevice::set(uint16_t addr, uint8_t value) {
         break;
 
     case KEY_PPUSCROLL:
-        if (m_ppu_reg_w == 0) {
+        if (m_reg_w == 0) {
+            // 1st write, we are reading X
+
             // t: ....... ...ABCDE <- d: ABCDE...
             // x:              FGH <- d: .....FGH
             // w:                  <- 1
 
-            // 1st write, we are reading X
-            m_ppuscroll_x = value16b;
+            clear_bits(&m_reg_t, 0b11111);
+            m_reg_t |= value16b >> 3;
 
-            clear_bits(&m_ppu_reg_t, 0b11111);
-            m_ppu_reg_t |= value16b >> 3;
+            m_reg_x = value & 0b111;
 
-            m_ppu_reg_x = value & 0b111;
         } else {
+            // 2nd write, we are reading Y
+
             // t: FGH..AB CDE..... <- d: ABCDEFGH
             // w:                  <- 0
 
-            // 2nd write, we are reading Y
-            m_ppuscroll_y = value;
-
-            clear_bits(&m_ppu_reg_t, 0b0111001111100000);
+            clear_bits(&m_reg_t, 0b0111001111100000);
             // set FGH
-            m_ppu_reg_t |= (value16b & 0b111) << 12;
+            m_reg_t |= (value16b & 0b111) << 12;
             // set ABCDE
-            m_ppu_reg_t |= (value16b & 0b11111000) << 5;
+            m_reg_t |= (value16b & 0b11111000) << 5;
         }
         // flip w
-        m_ppu_reg_w = !m_ppu_reg_w;
+        m_reg_w = !m_reg_w;
         break;
 
     case KEY_OAMDMA:
@@ -244,7 +243,7 @@ uint8_t PpuDevice::get(uint16_t addr) {
         retval = (m_ppustatus & (BIT7|BIT6|BIT5)) | (m_last_bus_value & (BIT4|BIT3|BIT2|BIT1|BIT0));
 
         // reset w register (PUSTATUS read side effect)
-        m_ppu_reg_w = 0;
+        m_reg_w = 0;
         m_ppustatus &= byte_not(PPUSTATUS_VBLANK);
         break;
     
@@ -306,7 +305,7 @@ void PpuDevice::tick() {
             m_ppustatus &= byte_not(PPUSTATUS_VBLANK);
         }
     } else if (8 <= column_no && column_no <= 240 && column_no%8 == 0) {
-        render_one_fucking_nametable_tile(column_no/8+1);
+        render_nametable_segment(column_no/8+1);
     } else if (column_no == 256) {
         // https://www.nesdev.org/wiki/PPU_scrolling#At_dot_256_of_each_scanline
         if (scanline_no == SCANLINE_PRE_RENDER || scanline_no <= SCANLINE_LAST_VISIBLE) {
@@ -318,11 +317,11 @@ void PpuDevice::tick() {
         // hori(t) -> hori(v) :
         // v: ....A.. ...BCDEF <- t: ....A.. ...BCDEF
         uint16_t filter = 0b0000010000011111;
-        m_ppu_reg_v = (m_ppu_reg_v & ~filter) | (m_ppu_reg_t & filter);
+        m_reg_v = (m_reg_v & ~filter) | (m_reg_t & filter);
 
     }  else if (column_no == 258) {
         if (scanline_no < SCANLINE_VBLANK_START) {
-            render_oam_line(scanline_no);
+            render_oam_scanline(scanline_no);
         }
     } else if (280 <= column_no && column_no <= 304) {
         // https://www.nesdev.org/wiki/PPU_scrolling#During_dots_280_to_304_of_the_pre-render_scanline_(end_of_vblank)
@@ -330,12 +329,12 @@ void PpuDevice::tick() {
             // vert(t) -> vert(v) :
             // v: GHIA.BC DEF..... <- t: GHIA.BC DEF.....
             uint16_t filter = 0b0111101111100000;
-            m_ppu_reg_v = (m_ppu_reg_v & ~filter) | (m_ppu_reg_t & filter);
+            m_reg_v = (m_reg_v & ~filter) | (m_reg_t & filter);
         }
     } else if (column_no == 328) {
-        render_one_fucking_nametable_tile(0);
+        render_nametable_segment(0);
     } else if (column_no == 336) {
-        render_one_fucking_nametable_tile(1);
+        render_nametable_segment(1);
     } 
     m_ntick++;
     if (m_ntick == SCANLINE_NUMBER * SCANLINE_LENGHT) {
@@ -345,7 +344,7 @@ void PpuDevice::tick() {
 }
 
 // renders the background
-void PpuDevice::render_one_fucking_nametable_tile(uint8_t sprite_x) {
+void PpuDevice::render_nametable_segment(uint8_t sprite_x) {
     // x is left to right
     // y is up to down
     // but for imshow x is up to down, y is left to right
@@ -371,8 +370,7 @@ void PpuDevice::render_one_fucking_nametable_tile(uint8_t sprite_x) {
 
     uint8_t sprite_y = (fine_y)/8;
     uint8_t sprite_line_no = (fine_y) % 8;
-    uint8_t x_shift = m_ppuscroll_x % 8;
-    uint16_t tile_addr = 0x2000 | (m_ppu_reg_v & 0x0FFF);
+    uint16_t tile_addr = 0x2000 | (m_reg_v & 0x0FFF);
 
     // if (sprite_x == 10) {
     //     // here lineno (i.e. the number of the line of the current rendered sprite)
@@ -380,13 +378,13 @@ void PpuDevice::render_one_fucking_nametable_tile(uint8_t sprite_x) {
     //     // if it is not the case thus reg v is badly updated
     //     // same goes for sprite y and addry when there is no scroll
     //     std::cout << "sl " << (int)scanline_no << " finey " << (int) fine_y << " spritey "  << (int) sprite_y << " lineno " << (int) sprite_line_no << std::endl;
-    //     uint16_t coarse_x = (m_ppu_reg_v & 0b11111);
-    //     uint16_t coarse_y = ((m_ppu_reg_v>>5) & 0b11111);
-    //     uint8_t addr_fine_y = (m_ppu_reg_v >> 12)&0b111;
+    //     uint16_t coarse_x = (m_reg_v & 0b11111);
+    //     uint16_t coarse_y = ((m_reg_v>>5) & 0b11111);
+    //     uint8_t addr_fine_y = (m_reg_v >> 12)&0b111;
     //     std::cout << "addrx " << (int) (coarse_x)  << " addry " << (int) (coarse_y) << " addrfiney " << (int) addr_fine_y << std::endl;
     // }
 
-    uint16_t attr_addr = 0x23C0 | (m_ppu_reg_v & 0x0C00) | ((m_ppu_reg_v >> 4) & 0x38) | ((m_ppu_reg_v >> 2) & 0x07);
+    uint16_t attr_addr = 0x23C0 | (m_reg_v & 0x0C00) | ((m_reg_v >> 4) & 0x38) | ((m_reg_v >> 2) & 0x07);
     uint8_t sprite_no = m_vram[tile_addr];
     uint8_t attr_bitshift = 0;
     if (sprite_y % 4 > 1) {
@@ -401,12 +399,11 @@ void PpuDevice::render_one_fucking_nametable_tile(uint8_t sprite_x) {
 
     bool table_no = get_ppuctrl_bit(PPUCTRL_BGPATTTABLE);
     // shift by fine x (thus register x)
-    add_sprite_line(&m_next_frame, sprite_no, table_no, sprite_x*8-m_ppu_reg_x, sprite_y*8, sprite_line_no, palette_no, false, false, false, false);
+    add_sprite_line_to_frame(&m_next_frame, sprite_no, table_no, sprite_x*8-m_reg_x, sprite_y*8, sprite_line_no, palette_no, false, false, false, false);
     coarse_x_incr();
 }
 
 void PpuDevice::dbg_render_fullnametable(cv::Mat * dbg_frame) {
-    static uint16_t prevscroll = 0;
     // x is left to right
     // y is up to down
     // but for imshow x is up to down, y is left to right
@@ -445,23 +442,15 @@ void PpuDevice::dbg_render_fullnametable(cv::Mat * dbg_frame) {
             uint8_t palette_no = ((m_vram[nametable_base_addr + attribute_table_addr] >> attr_bitshift) & 0b11);
             bool table_no = 1; //get_ppuctrl_bit(PPUCTRL_BGPATTTABLE);
             for (uint8_t line_no = 0; line_no < 8; line_no++) {
-                add_sprite_line(dbg_frame, sprite_no, table_no, screen_sprite_x*8, screen_sprite_y*8, line_no, palette_no, false, false, false, false, 512, 480);
+                add_sprite_line_to_frame(dbg_frame, sprite_no, table_no, screen_sprite_x*8, screen_sprite_y*8, line_no, palette_no, false, false, false, false, 512, 480);
             }
         }
-    }
-
-    for (uint16_t x = 0; x < 60*8; x++) {
-      // skip the zero values (HUD displaying)
-      //if (m_ppuscroll_x != 0) {
-        prevscroll = m_ppuscroll_x;
-      //}
-      dbg_frame->at<cv::Vec3b>(x, prevscroll) = cv::Vec3b(255, 0, 0);
     }
 }
 
 // renders the various sprites
 // used for OAM render
-void PpuDevice::render_oam_line(uint8_t line_no) {
+void PpuDevice::render_oam_scanline(uint8_t line_no) {
     
     bool spritesize = get_ppuctrl_bit(PPUCTRL_SPRITESIZE);
 
@@ -489,20 +478,20 @@ void PpuDevice::render_oam_line(uint8_t line_no) {
         // TODO : this is a lot of checks just for the first sprite...
         bool collision;
         if (i==0 && line_no >= 2) {
-            collision = add_sprite_line(&m_next_frame, sprite_no, table_no, sprite_x, sprite_y, line_no - sprite_y, palette_no, hflip, vflip, true, true);
+            collision = add_sprite_line_to_frame(&m_next_frame, sprite_no, table_no, sprite_x, sprite_y, line_no - sprite_y, palette_no, hflip, vflip, true, true);
             if (collision && 
                 ((m_ppumask & (PPUMASK_ENABLE_BG|PPUMASK_ENABLE_SPRITE))==(PPUMASK_ENABLE_BG|PPUMASK_ENABLE_SPRITE))) {
                 m_ppustatus |= PPUSTATUS_SPRITE0_COLLISION;
             }
         } else {
-            add_sprite_line(&m_next_frame, sprite_no, table_no, sprite_x, sprite_y, line_no - sprite_y, palette_no, hflip, vflip, true, false);
+            add_sprite_line_to_frame(&m_next_frame, sprite_no, table_no, sprite_x, sprite_y, line_no - sprite_y, palette_no, hflip, vflip, true, false);
         }
     }
 }
 
-bool PpuDevice::add_sprite_line(cv::Mat * frame, uint8_t sprite_no, bool table_no, uint16_t sprite_x, uint16_t sprite_y, uint8_t sprite_line, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision, uint16_t frame_width, uint16_t frame_height) { 
+bool PpuDevice::add_sprite_line_to_frame(cv::Mat * frame, uint8_t sprite_no, bool table_no, uint16_t sprite_x, uint16_t sprite_y, uint8_t sprite_line, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision, uint16_t frame_width, uint16_t frame_height) { 
     uint8_t sprite[8];
-    get_sprite_line(sprite, sprite_no, table_no, sprite_line, hflip, vflip);
+    get_sprite_line_from_rom(sprite, sprite_no, table_no, sprite_line, hflip, vflip);
     bool sprite0_collision = false;
     uint8_t bg_color_no = m_vram[0x3f10];
     uint8_t bg_color_r = NES_COLORS[bg_color_no][0];
@@ -540,29 +529,7 @@ bool PpuDevice::add_sprite_line(cv::Mat * frame, uint8_t sprite_no, bool table_n
     return sprite0_collision;
 }
 
-void PpuDevice::get_sprite(uint8_t sprite[8][8], uint8_t sprite_no, bool table_no, bool doubletile) {
-    /*
-    sprite is a uint8_t[8][8];
-    doubletile : 16x8 tile mode
-    */
-    if (doubletile) {
-        throw std::runtime_error("doubletile not implemented yet");
-    }
-
-    uint16_t plane0_addr = (sprite_no + 256*table_no) << 4;
-    for (uint8_t j = 0; j < 8; j++) {
-        uint8_t plane0 = m_chr_rom[plane0_addr + j];
-        uint8_t plane1 = m_chr_rom[plane0_addr + j + 8];
-        for (uint8_t i = 0; i < 8; i++) {
-            uint8_t color0 = (plane0 >> i) & 1;
-            uint8_t color1 = (plane1 >> i) & 1;
-            uint8_t color = (color1 << 1) + color0;
-            sprite[j][7-i] = color;
-        }
-    }
-}
-
-void PpuDevice::get_sprite_line(uint8_t sprite[8], uint8_t sprite_no, bool table_no, uint8_t sprite_line, bool hflip, bool vflip) {
+void PpuDevice::get_sprite_line_from_rom(uint8_t sprite[8], uint8_t sprite_no, bool table_no, uint8_t sprite_line, bool hflip, bool vflip) {
     /*
     sprite is a uint8_t[8];
     doubletile : 16x8 tile mode

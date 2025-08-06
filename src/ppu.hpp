@@ -60,15 +60,12 @@ private:
     // this is used to call the interrupt, same, could do better (interface ?)
     Emu6502 * m_cpu;
 
-    // cpu_interrupt = None
-    // cpu_ram = None
-
     uint8_t m_vram[0x4000] = {0}; // 14 bit addr space
     uint32_t m_ntick = 0;
-    bool m_ppu_reg_w = 0; // First or second write toggle (0 or 1)
-    uint16_t m_ppu_reg_t = 0;
-    uint16_t m_ppu_reg_v = 0;
-    uint8_t m_ppu_reg_x = 0; // actually only 3 bits
+    bool m_reg_w = 0; // First or second write toggle (0 or 1)
+    uint16_t m_reg_t = 0;
+    uint16_t m_reg_v = 0;
+    uint8_t m_reg_x = 0; // actually only 3 bits
     uint16_t m_ppuaddr = 0; // PPU register V
     uint8_t m_ppuctrl = 0;
     uint8_t m_ppumask = 0;
@@ -76,9 +73,6 @@ private:
     uint8_t m_ppuoam[256] = {0};
     uint8_t m_ppu_oam_addr = 0;
     uint8_t m_ppudata_buffer = 0; // ppudata does not read directly ram but a buffer that is updated after each read
-
-    uint8_t m_ppuscroll_x = 0;
-    uint8_t m_ppuscroll_y = 0;
 
     uint8_t m_controller_strobe = 0;
     uint8_t m_controller_read_no = 0;
@@ -97,13 +91,29 @@ private:
     void inc_ppuaddr();
     void coarse_x_incr();
     void y_incr();
-    bool add_sprite_line(cv::Mat *frame, uint8_t sprite_no, bool table_no, uint16_t sprite_x, uint16_t sprite_y, uint8_t sprite_line, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision, uint16_t frame_width = 256, uint16_t frame_height = 240);
-    void get_sprite(uint8_t sprite[8][8], uint8_t sprite_no, bool table_no, bool doubletile);
-    void get_sprite_line(uint8_t sprite[8], uint8_t sprite_no, bool table_no, uint8_t sprite_line, bool hflip, bool vflip);
-    void render_oam();
-    void render_oam_line(uint8_t line_no);
-    void render_one_fucking_nametable_tile(uint8_t sprite_x);
+
+    /**
+     * Add an horizontal line (i.e. 8 px wide, 1 px high) ot the given frame
+     */
+    bool add_sprite_line_to_frame(cv::Mat *frame, uint8_t sprite_no, bool table_no, uint16_t sprite_x, uint16_t sprite_y, uint8_t sprite_line, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision, uint16_t frame_width = 256, uint16_t frame_height = 240);
     
+    /**
+     * Recover an horizontal line of the sprite in the chr rom
+     */
+    void get_sprite_line_from_rom(uint8_t sprite[8], uint8_t sprite_no, bool table_no, uint8_t sprite_line, bool hflip, bool vflip);
+    
+    /**
+     * Renders one scanline of the OAM (i.e. the foreground)
+     */
+    void render_oam_scanline(uint8_t line_no);
+
+    /**
+     * Renders a 8px long, 1px high nametable (i.e. background) element
+     * Called every 8 columns
+     * It determines at the beggining if it has been called 
+     * on the right scanline (i.e. during visible render)
+     */
+    void render_nametable_segment(uint8_t sprite_x);
     
 public:
     void dbg_render_fullnametable(cv::Mat *dbg_frame);

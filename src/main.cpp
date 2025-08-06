@@ -17,7 +17,7 @@
 #include <signal.h>
 #include <map>
 
-#define DEBUG_WINDOW true
+#define DEBUG_WINDOW false
 #define LOG_DEBUG false
 
 typedef std::chrono::high_resolution_clock Clock;
