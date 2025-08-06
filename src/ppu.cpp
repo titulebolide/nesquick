@@ -501,7 +501,6 @@ void PpuDevice::render_oam_line(uint8_t line_no) {
 }
 
 bool PpuDevice::add_sprite_line(cv::Mat * frame, uint8_t sprite_no, bool table_no, uint16_t sprite_x, uint16_t sprite_y, uint8_t sprite_line, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision, uint16_t frame_width, uint16_t frame_height) { 
-    // palette = palettes[palette_no*4:palette_no*4 + 4]
     uint8_t sprite[8];
     get_sprite_line(sprite, sprite_no, table_no, sprite_line, hflip, vflip);
     bool sprite0_collision = false;
@@ -530,7 +529,7 @@ bool PpuDevice::add_sprite_line(cv::Mat * frame, uint8_t sprite_no, bool table_n
         uint8_t b = NES_COLORS[color_no][2];
         cv::Vec3b bg_color = frame->at<cv::Vec3b>(frame_y, frame_x);
         // TODO : same here,a lot of check for the sprite 0
-        if (check_collision && (bg_color[0] != bg_color_r && bg_color[1] != bg_color_g && bg_color[2] != bg_color_b) || true) { // todo : workaround here
+        if (check_collision && (bg_color[0] != bg_color_r && bg_color[1] != bg_color_g && bg_color[2] != bg_color_b)) {
             // background is set
             // TODO : do better, it relies on the background being black and nothing else being black
             sprite0_collision = true;
