@@ -400,9 +400,8 @@ void PpuDevice::render_one_fucking_nametable_tile(uint8_t sprite_x) {
     uint8_t palette_no = ((m_vram[attr_addr] >> attr_bitshift) & 0b11);
 
     bool table_no = get_ppuctrl_bit(PPUCTRL_BGPATTTABLE);
-    uint8_t actual_x_shift = 0; // todo : reinstate xshift
-
-    add_sprite_line(&m_next_frame, sprite_no, table_no, sprite_x*8-actual_x_shift, sprite_y*8, sprite_line_no, palette_no, false, false, false, false);
+    // shift by fine x (thus register x)
+    add_sprite_line(&m_next_frame, sprite_no, table_no, sprite_x*8-m_ppu_reg_x, sprite_y*8, sprite_line_no, palette_no, false, false, false, false);
     coarse_x_incr();
 }
 
