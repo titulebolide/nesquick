@@ -401,7 +401,7 @@ void PpuDevice::render_one_fucking_nametable_tile(uint8_t sprite_x) {
 
     bool table_no = get_ppuctrl_bit(PPUCTRL_BGPATTTABLE);
     uint8_t actual_x_shift = 0; // todo : reinstate xshift
-    
+
     add_sprite_line(&m_next_frame, sprite_no, table_no, sprite_x*8-actual_x_shift, sprite_y*8, sprite_line_no, palette_no, false, false, false, false, sprite_x == 10);
     coarse_x_incr();
 }
@@ -497,53 +497,6 @@ void PpuDevice::render_oam_line(uint8_t line_no) {
             }
         } else {
             add_sprite_line(&m_next_frame, sprite_no, table_no, sprite_x, sprite_y, line_no - sprite_y, palette_no, hflip, vflip, true, false);
-        }
-    }
-}
-
-// used for BG render
-void PpuDevice::add_sprite(cv::Mat * frame, uint8_t sprite_no, bool table_no, uint16_t sprite_x, uint16_t sprite_y, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg) { //(self, sprite_no, sprite_table_no, frame, spritex, spritey, palette_no, palettes, hflip, vflip):
-    // palette = palettes[palette_no*4:palette_no*4 + 4]
-    uint8_t sprite[8][8];
-    get_sprite(sprite, sprite_no, table_no, false);
-    bool sprite0_collision = false;
-    for (uint8_t y = 0; y < 8; y++) {
-        // I disable this check, it maybe intentional to have sprites that warps around
-        // if (sprite_y + y >= 240) {
-        //     continue;
-        // }
-        for (uint8_t x = 0; x < 8; x++) {
-            // if (sprite_x + x >= 256) {
-            //     continue;
-            // }
-            uint8_t pix_color = 0;
-            if (!hflip && !vflip) {
-                pix_color = sprite[y][x];
-            } else if (!vflip) { // only hflip
-                pix_color = sprite[y][7-x];
-            } else if (!hflip) { // only vflip
-                pix_color = sprite[7-y][x];
-            } else { // vflip and hflip
-                pix_color = sprite[7-y][7-x];
-            }
-            uint8_t color_no;
-            if (pix_color != 0) {
-                // 0x3f00 : palettes location in vram
-                // a palette : a set of 4 colors (4 bytes then)
-                // palette_no : the index of the palette in the palette list
-                // pix_color : the color in the palette
-                color_no = m_vram[0x3f00 + static_cast<uint16_t>(palette_no) * 4 + static_cast<uint16_t>(pix_color)];
-            } else if (!transparent_bg) {
-                color_no = m_vram[0x3f10];
-                // std::cout << (int) color_no << std::endl;
-            } else {
-                continue;
-            }
-            uint8_t r = NES_COLORS[color_no][0]; // TODO : get pointer
-            uint8_t g = NES_COLORS[color_no][1];
-            uint8_t b = NES_COLORS[color_no][2];
-            // TODO there are fatser ways to populate a frame
-            frame->at<cv::Vec3b>(sprite_y + y, sprite_x + x) = cv::Vec3b(r, g, b);
         }
     }
 }
