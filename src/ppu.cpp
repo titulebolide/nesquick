@@ -402,7 +402,7 @@ void PpuDevice::render_one_fucking_nametable_tile(uint8_t sprite_x) {
     bool table_no = get_ppuctrl_bit(PPUCTRL_BGPATTTABLE);
     uint8_t actual_x_shift = 0; // todo : reinstate xshift
 
-    add_sprite_line(&m_next_frame, sprite_no, table_no, sprite_x*8-actual_x_shift, sprite_y*8, sprite_line_no, palette_no, false, false, false, false, sprite_x == 10);
+    add_sprite_line(&m_next_frame, sprite_no, table_no, sprite_x*8-actual_x_shift, sprite_y*8, sprite_line_no, palette_no, false, false, false, false);
     coarse_x_incr();
 }
 
@@ -446,7 +446,7 @@ void PpuDevice::dbg_render_fullnametable(cv::Mat * dbg_frame) {
             uint8_t palette_no = ((m_vram[nametable_base_addr + attribute_table_addr] >> attr_bitshift) & 0b11);
             bool table_no = 1; //get_ppuctrl_bit(PPUCTRL_BGPATTTABLE);
             for (uint8_t line_no = 0; line_no < 8; line_no++) {
-                add_sprite_line(dbg_frame, sprite_no, table_no, screen_sprite_x*8, screen_sprite_y*8, line_no, palette_no, false, false, false, false);
+                add_sprite_line(dbg_frame, sprite_no, table_no, screen_sprite_x*8, screen_sprite_y*8, line_no, palette_no, false, false, false, false, 512, 480);
             }
         }
     }
@@ -501,7 +501,7 @@ void PpuDevice::render_oam_line(uint8_t line_no) {
     }
 }
 
-bool PpuDevice::add_sprite_line(cv::Mat * frame, uint8_t sprite_no, bool table_no, uint16_t sprite_x, uint16_t sprite_y, uint8_t sprite_line, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision, bool test) { //(self, sprite_no, sprite_table_no, frame, spritex, spritey, palette_no, palettes, hflip, vflip):
+bool PpuDevice::add_sprite_line(cv::Mat * frame, uint8_t sprite_no, bool table_no, uint16_t sprite_x, uint16_t sprite_y, uint8_t sprite_line, uint8_t palette_no, bool hflip, bool vflip, bool transparent_bg, bool check_collision, uint16_t frame_width, uint16_t frame_height) { 
     // palette = palettes[palette_no*4:palette_no*4 + 4]
     uint8_t sprite[8];
     get_sprite_line(sprite, sprite_no, table_no, sprite_line, hflip, vflip);
@@ -510,9 +510,9 @@ bool PpuDevice::add_sprite_line(cv::Mat * frame, uint8_t sprite_no, bool table_n
     uint8_t bg_color_r = NES_COLORS[bg_color_no][0];
     uint8_t bg_color_g = NES_COLORS[bg_color_no][1];
     uint8_t bg_color_b = NES_COLORS[bg_color_no][2];
-    uint16_t frame_y = (sprite_y + sprite_line); // % (30*8);
+    uint16_t frame_y = (sprite_y + sprite_line) % frame_height;
     for (uint8_t x = 0; x < 8; x++) {
-        uint16_t frame_x = (sprite_x + x); // % (32*8);
+        uint16_t frame_x = (sprite_x + x) % frame_width;
         uint8_t pix_color = sprite[x];
         uint8_t color_no;
         if (pix_color != 0) {
@@ -595,10 +595,5 @@ cv::Mat * PpuDevice::getFrame() {
 
 void PpuDevice::saveFrame() {
     m_next_frame.copyTo(m_last_frame);
-
-    for (int16_t screen_sprite_y = 0; screen_sprite_y < 60*4; screen_sprite_y++) {
-        for (int16_t screen_sprite_x = 0; screen_sprite_x < 64*4; screen_sprite_x++) {
-            m_next_frame.at<cv::Vec3b>(screen_sprite_y, screen_sprite_x) = cv::Vec3b(0, 0, 0);
-        }
-    }
+    
 }
