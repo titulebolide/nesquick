@@ -386,12 +386,18 @@ void PpuDevice::render_nametable_segment(uint8_t sprite_x) {
 
     uint16_t attr_addr = 0x23C0 | (m_reg_v & 0x0C00) | ((m_reg_v >> 4) & 0x38) | ((m_reg_v >> 2) & 0x07);
     uint8_t sprite_no = m_vram[tile_addr];
+
+    // palette determination
+    // TODO : i suppose we can be a bit more efficient by just testing one particular bit of m_regv
+    // i guess regv_coarse_y % 4 > 1 is equivalent to testing bit 6 of m_reg_v
+    uint8_t regv_coarse_y = ((m_reg_v>>5) & 0b11111);
+    uint8_t regv_coarse_x = (m_reg_v & 0b11111);
     uint8_t attr_bitshift = 0;
-    if (sprite_y % 4 > 1) {
+    if (regv_coarse_y % 4 > 1) {
         // bottom
         attr_bitshift += 4;
     }
-    if (sprite_x % 4 > 1) {
+    if (regv_coarse_x % 4 > 1) {
         // right
         attr_bitshift += 2;
     }
