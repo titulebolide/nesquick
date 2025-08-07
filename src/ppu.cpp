@@ -524,7 +524,7 @@ bool PpuDevice::add_sprite_line_to_frame(cv::Mat * frame, uint8_t sprite_no, boo
         uint8_t b = NES_COLORS[color_no][2];
         cv::Vec3b bg_color = frame->at<cv::Vec3b>(frame_y, frame_x);
         // TODO : same here,a lot of check for the sprite 0
-        if (check_collision && (bg_color[0] != bg_color_r && bg_color[1] != bg_color_g && bg_color[2] != bg_color_b)) {
+        if (check_collision && (bg_color[0] != bg_color_r || bg_color[1] != bg_color_g || bg_color[2] != bg_color_b)) {
             // background is set
             // TODO : do better, it relies on the background being black and nothing else being black
             sprite0_collision = true;
