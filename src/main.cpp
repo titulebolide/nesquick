@@ -18,6 +18,7 @@
 #include <map>
 
 #define DEBUG_WINDOW false
+#define LOG_DEBUG false
 
 typedef std::chrono::high_resolution_clock Clock;
 
@@ -180,7 +181,7 @@ void run(Emu6502 * cpu, PpuDevice * ppu, ApuDevice * apu, bool * thread_done) {
             load_sum += (float)elapsed_time / (float)TIME_BETWEEN_PAUSE_US;
             load_num++;
             if (load_num == 100) {
-                std::cout << "Load : " << load_sum << "% " << TIME_BETWEEN_PAUSE_US << "µs" << std::endl;
+                // std::cout << "Load : " << load_sum << "% " << TIME_BETWEEN_PAUSE_US << "µs" << std::endl;
                 load_sum = 0.0f;
                 load_num = 0;
             }
@@ -202,7 +203,9 @@ int main() {
     parseInes("/home/titus/dev/nesquick/rom/smb1/bin/smb1.nes", prg, chr, &prgLen, &chrLen);
     LstDebuggerAsm6 lst("/home/titus/dev/nesquick/rom/smb1/bin/smb1.lst", true);
 
-    // parseInes("/home/titus/dev/nesquick/rom/pacman.nes", prg, chr, &prgLen, &chrLen);
+    // parseInes("/home/titus/dev/nesquick/rom/tetris.nes", prg, chr, &prgLen, &chrLen);
+
+    // std::cout << "ROM parsed, prgLen " << prgLen << " chrLen " << chrLen << std::endl;
 
 
     uint16_t rom_base_addr = 0x10000 - prgLen;
@@ -220,7 +223,7 @@ int main() {
         {rom_base_addr, &rom},
     });
 
-    Emu6502 cpu(&mem, false, &lst);
+    Emu6502 cpu(&mem, LOG_DEBUG, &lst);
     ppu.set_cpu(&cpu); // urgh
     apu.set_cpu(&cpu); // urgh
 

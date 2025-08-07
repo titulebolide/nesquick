@@ -245,7 +245,8 @@ void Emu6502::in_de_mem(uint16_t addr, bool sign_plus) {
 
 void Emu6502::add_val_to_acc_carry(uint8_t val) {
     // use a uint16_t to detect for a carry
-    // TODO : maybe remove some of the static cast ? 
+    // TODO : maybe remove some of the static cast ?
+    bool same_sign_than_regA = (((val ^ regs[REG_A]) & BIT7) == 0);
     uint16_t bigval = static_cast<uint16_t>(val);
     if (get_status_bit(STATUS_CARRY)) {
         // there is a carry
@@ -256,6 +257,15 @@ void Emu6502::add_val_to_acc_carry(uint8_t val) {
     set_status_bit(STATUS_CARRY, bigval > 255);
     regs[REG_A] = static_cast<uint8_t>(bigval);
     update_zn_flag(regs[REG_A]);
+    if (same_sign_than_regA) {
+        // if the val and reg A were the same sign
+        // and val and the res are no longer the same sign
+        // we have an overflow
+        bool same_sign_than_result = (((val ^ regs[REG_A]) & BIT7) == 0);
+        set_status_bit(STATUS_OVFLO, !same_sign_than_result);
+    } else {
+        set_status_bit(STATUS_OVFLO, false);
+    }
 }
 
 void Emu6502::op_adc() {
@@ -414,7 +424,7 @@ void Emu6502::dbg() {
     }
     if (DEBUG_TYPE_MESEN) {
         // Matching Mesen custom format : A:[A,2h] X:[X,2h] Y:[Y,2h] S:[SP,2h] P:[P,8]
-        std::cout << hexstr(prgm_ctr) << "  A:" << hexstr(regs[REG_A]) << " X:" << hexstr(regs[REG_X]) << " Y:" << hexstr(regs[REG_Y]) << " SP:" << hexstr(regs[REG_SP]) << " S:" << hexstr(regs[REG_S]) << std::endl;
+        std::cout << hexstr(prgm_ctr) << "  A:" << hexstr(regs[REG_A]) << " X:" << hexstr(regs[REG_X]) << " Y:" << hexstr(regs[REG_Y]) << " SP:" << hexstr(regs[REG_SP]) << " S:" << hexstr(regs[REG_S]) << " $0310:" << hexstr(mem->get(0X0301)) << " $0773:" << hexstr(mem->get(0X0773)) << std::endl;
     } else {
         std::string inst = "";
         if (lst != nullptr) {

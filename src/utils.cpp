@@ -9,8 +9,11 @@
 #include <chrono>
 #include "utils.hpp"
 
-// Utility functions
 uint8_t byte_not(uint8_t val) {
+    return ~val;
+}
+
+uint16_t byte_not(uint16_t val) {
     return ~val;
 }
 
@@ -50,14 +53,14 @@ std::string binstr(uint8_t value) {
 
 std::string hexstr(uint8_t value) {
     std::stringstream ss;
-    ss << std::setw(2) << std::setfill('0')
+    ss << std::uppercase << std::setw(2) << std::setfill('0')
        << std::hex << static_cast<int>(value);
     return ss.str();
 }
 
 std::string hexstr(uint16_t value) {
     std::stringstream ss;
-    ss << std::setw(4) << std::setfill('0')
+    ss << std::uppercase << std::setw(4) << std::setfill('0')
        << std::hex << static_cast<int>(value);
     return ss.str();
 }
@@ -88,3 +91,12 @@ void parseInes(const std::string& filename, uint8_t * prg, uint8_t * chr, uint16
         chr[addr] = data[16 + *prgLen + addr];
     }
 }
+
+void clear_bits(uint8_t *value, uint8_t bitmask) {
+    *value &= byte_not(bitmask);
+}
+
+void clear_bits(uint16_t *value, uint16_t bitmask) {
+    *value &= byte_not(bitmask);
+}
+

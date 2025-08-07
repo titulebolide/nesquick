@@ -4,6 +4,7 @@
 #include <string>
 
 uint8_t byte_not(uint8_t val);
+uint16_t byte_not(uint16_t val);
 void sleep(int sec);
 std::string dec2hex(uint16_t val);
 uint8_t low_byte(uint16_t val);
@@ -15,3 +16,5 @@ std::string hexstr(uint8_t value);
 std::string binstr(uint8_t value);
 std::string hexstr(uint16_t value);
 void parseInes(const std::string& filename, uint8_t * prg, uint8_t * chr, uint16_t *prgLen, uint16_t *chrLen);
+void clear_bits(uint8_t *value, uint8_t bitmask);
+void clear_bits(uint16_t *value, uint16_t bitmask);
